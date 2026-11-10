@@ -1,0 +1,2806 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIM-PESAWARAN - Smart Infrastructure Monitoring Kabupaten Pesawaran</title>
+  
+  <!-- Fonts & CDN Libraries -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Leaflet CSS & JS for GIS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              primary: '#123B5D',
+              secondary: '#1685B9',
+              success: '#20A477',
+              warning: '#E5A33A',
+              danger: '#D94C4C',
+              bg: '#F1F4F8',
+              surface: '#FFFFFF'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F1F4F8;
+      color: #1e293b;
+    }
+    .leaflet-popup-content-wrapper {
+      border-radius: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+      padding: 4px;
+    }
+    .watermark-badge {
+      background: rgba(18, 59, 93, 0.08);
+      border: 1px dashed #123B5D;
+    }
+    /* Custom Leaflet Map Pins & Overlays */
+    .custom-map-icon {
+      background: transparent;
+      border: none;
+    }
+    .pulse-warning-pin {
+      position: relative;
+    }
+    .pulse-warning-pin::after {
+      content: '';
+      position: absolute;
+      top: -3px;
+      left: -3px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(220, 38, 38, 0.45);
+      animation: pinWarningPulse 1.8s infinite ease-out;
+      pointer-events: none;
+    }
+    @keyframes pinWarningPulse {
+      0% { transform: scale(0.6); opacity: 1; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+    .map-floating-panel {
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(6px);
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.15);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      border-radius: 10px;
+    }
+    @media print {
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      body { background: white !important; }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+  <!-- Top Simulation & Collaboration Alert Banner -->
+  <div class="no-print bg-[#123B5D] text-white px-4 py-2 text-xs flex flex-wrap items-center justify-between border-b border-blue-900 shadow-sm">
+    <div class="flex items-center gap-2">
+      <span class="bg-[#E5A33A] text-slate-900 font-extrabold px-2 py-0.5 rounded text-[10px] tracking-wider uppercase">DATA SIMULASI</span>
+      <span class="font-medium text-slate-200">Prototipe Sistem Monitoring Infrastruktur Kabupaten Pesawaran &bull; Dinas PUPR &times; UTI</span>
+    </div>
+    <div class="flex items-center gap-3 mt-1 sm:mt-0 text-[11px] text-slate-300">
+      <span>Tahun Implementasi: <strong class="text-white">2026</strong></span>
+      <span>&bull;</span>
+      <span class="text-emerald-400 font-semibold flex items-center gap-1">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Sistem Aktif
+      </span>
+    </div>
+  </div>
+
+  <!-- Main Navigation Header -->
+  <header class="no-print bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-20">
+        
+        <!-- Left: Branding & Logos (Pesawaran Kiri, Teknokrat Kanan) -->
+        <div class="flex items-center gap-4">
+          <!-- Logo Pemkab Pesawaran -->
+          <div class="flex items-center gap-2.5">
+            <img src="./public/assets/branding/pesawaran.svg" alt="Logo Pemkab Pesawaran" class="h-12 w-auto object-contain drop-shadow" />
+            <div>
+              <p class="text-[10px] uppercase font-bold tracking-wider text-slate-500">Pemerintah Kabupaten</p>
+              <h1 class="text-base font-extrabold text-[#123B5D] leading-none tracking-tight">PESAWARAN</h1>
+              <p class="text-[10px] font-semibold text-[#1685B9]">Dinas Pekerjaan Umum & Penataan Ruang</p>
+            </div>
+          </div>
+
+          <div class="h-9 w-px bg-slate-300 mx-1 hidden md:block"></div>
+
+          <!-- Logo Universitas Teknokrat Indonesia -->
+          <div class="hidden md:flex items-center gap-2.5">
+            <img src="./public/assets/branding/teknokrat.svg" alt="Logo Universitas Teknokrat Indonesia" class="h-12 w-auto object-contain drop-shadow" />
+            <div>
+              <p class="text-[10px] uppercase font-bold tracking-wider text-slate-500">Mitra Akademik</p>
+              <p class="text-xs font-black text-[#123B5D] leading-none">UNIVERSITAS TEKNOKRAT</p>
+              <p class="text-[10px] font-bold text-amber-600">INDONESIA &bull; Sang Juara</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Center/Right: Role Switcher & User Profile -->
+        <div class="flex items-center gap-3">
+          <!-- Role Switcher -->
+          <div class="bg-slate-100 p-1 rounded-xl border border-slate-200 flex items-center">
+            <span class="text-[11px] font-semibold text-slate-500 px-2 flex items-center gap-1 hidden lg:inline-flex">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 text-[#1685B9]"></i> Role Demo:
+            </span>
+            <select id="roleSelector" onchange="changeRole(this.value)" class="text-xs font-semibold bg-white text-[#123B5D] border border-slate-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#1685B9]">
+              <option value="administrator">🛡️ Administrator (PUPR)</option>
+              <option value="opd">🏢 OPD / Verifikator</option>
+              <option value="petugas_lapangan">👷 Petugas Lapangan</option>
+              <option value="masyarakat">👥 Masyarakat (Publik)</option>
+            </select>
+          </div>
+
+          <!-- Fast Ticket Track Button -->
+          <button onclick="navigateTo('tracking')" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-200 flex items-center gap-1.5 transition">
+            <i data-lucide="search" class="w-3.5 h-3.5"></i> Lacak Tiket
+          </button>
+
+          <!-- Notification bell -->
+          <button onclick="showToast('Notifikasi: 2 aduan baru di Kec. Gedong Tataan memerlukan verifikasi.')" class="relative p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition">
+            <i data-lucide="bell" class="w-5 h-5"></i>
+            <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Navigation Tabs / Sub-bar -->
+    <div class="bg-[#123B5D] text-white">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <nav class="flex space-x-1 sm:space-x-2 overflow-x-auto py-2 scrollbar-none text-xs font-semibold" id="mainNavBar">
+          <button onclick="navigateTo('dashboard')" data-tab="dashboard" class="nav-btn px-3 py-1.5 rounded-md flex items-center gap-1.5 bg-[#1685B9] text-white">
+            <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+          </button>
+          <button onclick="navigateTo('gis')" data-tab="gis" class="nav-btn px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-white/10 text-slate-200">
+            <i data-lucide="map" class="w-4 h-4"></i> Peta GIS Spasial
+          </button>
+          <button onclick="navigateTo('assets')" data-tab="assets" class="nav-btn px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-white/10 text-slate-200">
+            <i data-lucide="layers" class="w-4 h-4"></i> Data Infrastruktur
+          </button>
+          <button onclick="navigateTo('aduan')" data-tab="aduan" class="nav-btn px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-white/10 text-slate-200">
+            <i data-lucide="megaphone" class="w-4 h-4"></i> Lapor Kerusakan
+          </button>
+          <button onclick="navigateTo('verifikasi')" data-tab="verifikasi" class="nav-btn px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-white/10 text-slate-200">
+            <i data-lucide="check-square" class="w-4 h-4"></i> Verifikasi & SPK
+          </button>
+          <button onclick="navigateTo('inspeksi')" data-tab="inspeksi" class="nav-btn px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-white/10 text-slate-200">
+            <i data-lucide="clipboard-list" class="w-4 h-4"></i> Inspeksi Lapangan
+          </button>
+          <button onclick="navigateTo('pemeliharaan')" data-tab="pemeliharaan" class="nav-btn px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-white/10 text-slate-200">
+            <i data-lucide="wrench" class="w-4 h-4"></i> Monitoring Perbaikan
+          </button>
+          <button onclick="navigateTo('statistik')" data-tab="statistik" class="nav-btn px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-white/10 text-slate-200">
+            <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Statistik & Kondisi
+          </button>
+          <button onclick="navigateTo('ekspor')" data-tab="ekspor" class="nav-btn px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-white/10 text-slate-200">
+            <i data-lucide="file-text" class="w-4 h-4"></i> Ekspor Laporan
+          </button>
+          <button onclick="navigateTo('pengguna')" data-tab="pengguna" class="nav-btn px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-white/10 text-slate-200">
+            <i data-lucide="users" class="w-4 h-4"></i> Pengguna & Audit
+          </button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Toast Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm"></div>
+
+  <!-- Content Containers for Tabs -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+    <!-- 1. DASHBOARD VIEW -->
+    <section id="view-dashboard" class="tab-view space-y-6">
+      
+      <!-- Welcome & Alert Box -->
+      <div class="bg-gradient-to-r from-[#123B5D] to-[#1685B9] text-white p-6 rounded-2xl shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="bg-amber-400 text-slate-900 text-xs font-black px-2 py-0.5 rounded uppercase">SIM-PESAWARAN v1.0</span>
+            <span class="text-xs text-sky-100">Dinas PUPR Kabupaten Pesawaran</span>
+          </div>
+          <h2 class="text-2xl font-black tracking-tight">Sistem Monitoring Terpadu Infrastruktur Daerah</h2>
+          <p class="text-sm text-sky-100 mt-1 max-w-2xl">
+            Pemantauan berkala jalan kabupaten, jembatan, dan saluran drainase terintegrasi GIS dengan alur verifikasi pengaduan warga secara real-time.
+          </p>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="navigateTo('aduan')" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow transition">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i> Buat Laporan Baru
+          </button>
+          <button onclick="navigateTo('gis')" class="bg-white/15 hover:bg-white/25 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 border border-white/20 transition">
+            <i data-lucide="map-pin" class="w-4 h-4"></i> Buka Peta Spasial
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Cards Row -->
+      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
+        <!-- 1. Total Jalan -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+          <div class="flex items-center justify-between text-slate-500 mb-2">
+            <span class="text-xs font-semibold">Ruas Jalan</span>
+            <span class="p-1.5 bg-blue-50 text-[#123B5D] rounded-lg"><i data-lucide="milestone" class="w-4 h-4"></i></span>
+          </div>
+          <div class="text-xl font-black text-[#123B5D]" id="kpi-jalan-km">482.5 km</div>
+          <p class="text-[11px] text-slate-400 mt-0.5">38 Ruas Terdata</p>
+        </div>
+
+        <!-- 2. Total Jembatan -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+          <div class="flex items-center justify-between text-slate-500 mb-2">
+            <span class="text-xs font-semibold">Jembatan</span>
+            <span class="p-1.5 bg-sky-50 text-[#1685B9] rounded-lg"><i data-lucide="anchor" class="w-4 h-4"></i></span>
+          </div>
+          <div class="text-xl font-black text-[#123B5D]" id="kpi-jembatan-count">64 Unit</div>
+          <p class="text-[11px] text-slate-400 mt-0.5">92% Layak Operasi</p>
+        </div>
+
+        <!-- 3. Drainase -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+          <div class="flex items-center justify-between text-slate-500 mb-2">
+            <span class="text-xs font-semibold">Drainase</span>
+            <span class="p-1.5 bg-teal-50 text-teal-600 rounded-lg"><i data-lucide="waves" class="w-4 h-4"></i></span>
+          </div>
+          <div class="text-xl font-black text-[#123B5D]" id="kpi-drainase-m">128.4 km</div>
+          <p class="text-[11px] text-slate-400 mt-0.5">Saluran Primer/Sekunder</p>
+        </div>
+
+        <!-- 4. Kondisi Mantap -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+          <div class="flex items-center justify-between text-emerald-600 mb-2">
+            <span class="text-xs font-semibold">Kondisi Mantap</span>
+            <span class="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg"><i data-lucide="check-circle-2" class="w-4 h-4"></i></span>
+          </div>
+          <div class="text-xl font-black text-emerald-600" id="kpi-kondisi-mantap">76.4%</div>
+          <p class="text-[11px] text-slate-400 mt-0.5">368.6 km jalan baik</p>
+        </div>
+
+        <!-- 5. Laporan Masuk -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+          <div class="flex items-center justify-between text-amber-600 mb-2">
+            <span class="text-xs font-semibold">Aduan Baru</span>
+            <span class="p-1.5 bg-amber-50 text-amber-600 rounded-lg"><i data-lucide="inbox" class="w-4 h-4"></i></span>
+          </div>
+          <div class="text-xl font-black text-amber-600" id="kpi-aduan-baru">8 Tiket</div>
+          <p class="text-[11px] text-slate-400 mt-0.5">Perlu Verifikasi</p>
+        </div>
+
+        <!-- 6. Dalam Pengerjaan -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+          <div class="flex items-center justify-between text-indigo-600 mb-2">
+            <span class="text-xs font-semibold">Perbaikan Aktif</span>
+            <span class="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg"><i data-lucide="hammer" class="w-4 h-4"></i></span>
+          </div>
+          <div class="text-xl font-black text-indigo-600" id="kpi-aduan-proses">5 SPK</div>
+          <p class="text-[11px] text-slate-400 mt-0.5">Progres Fisik</p>
+        </div>
+
+        <!-- 7. Selesai Ditangani -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+          <div class="flex items-center justify-between text-teal-600 mb-2">
+            <span class="text-xs font-semibold">Tuntas 2026</span>
+            <span class="p-1.5 bg-teal-50 text-teal-600 rounded-lg"><i data-lucide="award" class="w-4 h-4"></i></span>
+          </div>
+          <div class="text-xl font-black text-teal-600" id="kpi-aduan-selesai">24 Titik</div>
+          <p class="text-[11px] text-slate-400 mt-0.5">Sudah Diverifikasi</p>
+        </div>
+      </div>
+
+      <!-- Quick GIS Overview & Feed -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- GIS Mini Map -->
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                <i data-lucide="map" class="w-5 h-5 text-[#1685B9]"></i>
+                Peta Sebaran Infrastruktur & Aduan Pesawaran
+              </h3>
+              <p class="text-xs text-slate-500">Klik titik marker untuk melihat ringkasan kondisi dan aksi.</p>
+            </div>
+            <button onclick="navigateTo('gis')" class="text-xs font-bold text-[#1685B9] hover:underline flex items-center gap-1">
+              Buka Peta Penuh <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+          
+          <div id="miniMap" class="w-full h-80 rounded-xl border border-slate-200 overflow-hidden relative z-0"></div>
+          
+          <!-- Legend summary -->
+          <div class="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-slate-100 text-xs">
+            <span class="flex items-center gap-1.5 font-medium text-slate-600">
+              <span class="w-3 h-3 rounded-full bg-emerald-500"></span> Jalan Mantap
+            </span>
+            <span class="flex items-center gap-1.5 font-medium text-slate-600">
+              <span class="w-3 h-3 rounded-full bg-amber-500"></span> Rusak Ringan/Sedang
+            </span>
+            <span class="flex items-center gap-1.5 font-medium text-slate-600">
+              <span class="w-3 h-3 rounded-full bg-red-500"></span> Rusak Berat / Kritis
+            </span>
+            <span class="flex items-center gap-1.5 font-medium text-slate-600">
+              <span class="w-3 h-3 rounded-full bg-blue-500"></span> Jembatan
+            </span>
+            <span class="flex items-center gap-1.5 font-medium text-slate-600">
+              <span class="w-3 h-3 rounded-full bg-cyan-500"></span> Drainase
+            </span>
+          </div>
+        </div>
+
+        <!-- Recent Incident Reports Feed -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                <i data-lucide="bell-ring" class="w-5 h-5 text-amber-500"></i>
+                Aduan Warga Terbaru
+              </h3>
+              <p class="text-xs text-slate-500">Masuk melalui portal publik</p>
+            </div>
+            <button onclick="navigateTo('verifikasi')" class="text-xs font-semibold text-[#1685B9] hover:underline">
+              Kelola Semua
+            </button>
+          </div>
+
+          <div id="dashboardRecentReports" class="space-y-3 overflow-y-auto max-h-[340px] pr-1">
+            <!-- Dynamic items rendered via JS -->
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- 2. GIS SPATIAL MAP VIEW -->
+    <section id="view-gis" class="tab-view hidden space-y-4">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        
+        <!-- Filter & GIS Tools Bar -->
+        <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <i data-lucide="map-pinned" class="w-6 h-6 text-[#1685B9]"></i>
+                Peta Geospasial Infrastruktur Kabupaten Pesawaran
+              </h2>
+              <span id="gisActiveCountBadge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-sky-100 text-sky-800">
+                Memuat Data...
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">Pemantauan visual spasial terintegrasi: jaringan jalan, jembatan, drainase, dan sebaran aduan warga.</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 text-xs w-full lg:w-auto">
+            <!-- Search Asset on Map -->
+            <div class="relative flex-1 sm:w-56">
+              <input type="text" id="gisSearchInput" placeholder="Cari ruas jalan / jembatan..." onkeyup="if(event.key==='Enter') searchGisAsset()" class="w-full text-xs pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#1685B9]">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+            </div>
+
+            <!-- Basemap Switcher -->
+            <div class="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-inner">
+              <button id="btnBaseOsm" onclick="setBaseMap('osm')" title="OpenStreetMap Standard" class="px-2 py-1 text-[11px] font-bold rounded-md bg-white text-[#123B5D] shadow-sm transition">🗺️ Standar</button>
+              <button id="btnBaseSat" onclick="setBaseMap('sat')" title="Citra Satelit Resolusi Tinggi Esri" class="px-2 py-1 text-[11px] font-medium rounded-md text-slate-600 hover:text-slate-900 transition">🛰️ Satelit</button>
+              <button id="btnBaseLight" onclick="setBaseMap('light')" title="CartoDB Positron Bersih" class="px-2 py-1 text-[11px] font-medium rounded-md text-slate-600 hover:text-slate-900 transition">🏙️ Terang</button>
+              <button id="btnBaseTopo" onclick="setBaseMap('topo')" title="OpenTopoMap Kontur Alam" class="px-2 py-1 text-[11px] font-medium rounded-md text-slate-600 hover:text-slate-900 transition">🏔️ Topo</button>
+            </div>
+
+            <!-- Kecamatan Filter (Auto-FlyTo) -->
+            <select id="gisFilterKecamatan" onchange="onGisKecamatanChange()" class="bg-slate-50 border border-slate-300 font-semibold text-slate-700 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-[#1685B9]">
+              <option value="all">Semua Kecamatan (11)</option>
+              <option value="Gedong Tataan">Gedong Tataan (Ibukota)</option>
+              <option value="Kedondong">Kedondong</option>
+              <option value="Way Lima">Way Lima</option>
+              <option value="Padang Cermin">Padang Cermin</option>
+              <option value="Teluk Pandan">Teluk Pandan (Pesisir)</option>
+              <option value="Punduh Pedada">Punduh Pedada</option>
+              <option value="Negeri Katon">Negeri Katon</option>
+              <option value="Tegineneng">Tegineneng</option>
+              <option value="Way Ratai">Way Ratai</option>
+              <option value="Way Khilau">Way Khilau</option>
+              <option value="Marga Punduh">Marga Punduh</option>
+            </select>
+
+            <!-- Condition Filter -->
+            <select id="gisFilterKondisi" onchange="applyGisFilter()" class="bg-slate-50 border border-slate-300 font-semibold text-slate-700 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-[#1685B9]">
+              <option value="all">Semua Kondisi</option>
+              <option value="mantap">🟢 Mantap</option>
+              <option value="sedang">🟡 Sedang</option>
+              <option value="rusak_ringan">🟠 Rusak Ringan</option>
+              <option value="rusak_berat">🔴 Rusak Berat</option>
+            </select>
+
+            <!-- Locate Me -->
+            <button onclick="locateUserOnMap()" title="Deteksi Koordinat GPS Perangkat" class="px-2.5 py-1.5 bg-sky-50 hover:bg-sky-100 text-[#1685B9] border border-sky-200 rounded-lg font-bold flex items-center gap-1 transition">
+              <i data-lucide="crosshair" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">GPS</span>
+            </button>
+
+            <!-- Reset Center -->
+            <button onclick="resetMapCenter()" title="Fokus ke Kabupaten Pesawaran" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold flex items-center gap-1 transition">
+              <i data-lucide="locate-fixed" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Reset</span>
+            </button>
+
+            <!-- Fullscreen -->
+            <button onclick="toggleMapFullscreen()" title="Layar Penuh Peta" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold flex items-center gap-1 transition">
+              <i data-lucide="maximize" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Layer Checkboxes & Legend Helper Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 py-2.5 text-xs font-semibold text-slate-700 border-b border-slate-100">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="text-slate-400">Lapisan Spasial:</span>
+            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 px-2 py-1 rounded-md border border-slate-200 hover:bg-slate-100">
+              <input type="checkbox" id="layerJalan" checked onchange="applyGisFilter()" class="rounded text-[#123B5D]">
+              <span>🛣️ Ruas Jalan</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 px-2 py-1 rounded-md border border-slate-200 hover:bg-slate-100">
+              <input type="checkbox" id="layerJembatan" checked onchange="applyGisFilter()" class="rounded text-[#1685B9]">
+              <span>🌉 Jembatan</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 px-2 py-1 rounded-md border border-slate-200 hover:bg-slate-100">
+              <input type="checkbox" id="layerDrainase" checked onchange="applyGisFilter()" class="rounded text-teal-600">
+              <span>🌊 Drainase</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 px-2 py-1 rounded-md border border-slate-200 hover:bg-slate-100">
+              <input type="checkbox" id="layerAduan" checked onchange="applyGisFilter()" class="rounded text-red-600">
+              <span>⚠️ Aduan Warga</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 px-2 py-1 rounded-md border border-slate-200 hover:bg-slate-100">
+              <input type="checkbox" id="layerKecamatan" checked onchange="applyGisFilter()" class="rounded text-indigo-600">
+              <span>🏛️ Kantor & Batas Kecamatan</span>
+            </label>
+          </div>
+          <span class="text-[11px] text-slate-500 font-normal hidden md:inline">
+            💡 <em>Klik peta untuk memilih koordinat aduan / proyek baru.</em>
+          </span>
+        </div>
+
+        <!-- GIS Full Interactive Map Container with Floating Overlays -->
+        <div class="relative mt-3">
+          <div id="fullMap" class="w-full h-[560px] rounded-xl border border-slate-300 relative z-0 overflow-hidden shadow-sm"></div>
+
+          <!-- Floating Legend (Bottom-Right) -->
+          <div class="absolute bottom-4 right-4 z-[400] map-floating-panel p-3 text-[11px] space-y-1.5 max-w-[210px] hidden sm:block">
+            <p class="font-black text-[#123B5D] uppercase text-[10px] tracking-wider border-b border-slate-200 pb-1">LEGENDA SPASIAL PUPR</p>
+            <div class="space-y-1 text-slate-700">
+              <div class="flex items-center gap-2">
+                <span class="w-4 h-1.5 rounded-full bg-[#20A477]"></span>
+                <span class="font-medium">Jalan Mantap (Baik)</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-4 h-1.5 rounded-full bg-[#E5A33A]"></span>
+                <span class="font-medium">Jalan Sedang</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-4 h-1.5 rounded-full bg-[#D94C4C]"></span>
+                <span class="font-medium">Jalan Rusak Berat</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-3.5 h-3.5 rounded bg-blue-600 text-white text-[9px] flex items-center justify-center font-bold">🌉</span>
+                <span class="font-medium">Jembatan Daerah</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-4 h-1 border-b-2 border-dashed border-teal-500"></span>
+                <span class="font-medium">Saluran Drainase</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></span>
+                <span class="font-medium text-red-700 font-bold">Aduan Kerusakan Warga</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Map Coordinate Pointer & Status helper -->
+        <div class="mt-2 text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span id="mapCoordDisplay">Arahkan kursor pada peta untuk melihat koordinat WGS84.</span>
+          </div>
+          <div class="flex items-center gap-3 text-slate-400">
+            <span>Kabupaten Pesawaran (11 Kecamatan)</span>
+            <span>&bull;</span>
+            <span>Leaflet GIS &amp; Multi-Basemap</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 3. DATA INFRASTRUKTUR (JALAN, JEMBATAN, DRAINASE) -->
+    <section id="view-assets" class="tab-view hidden space-y-4">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
+            <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="layers" class="w-6 h-6 text-[#123B5D]"></i>
+              Inventarisasi Aset Infrastruktur
+            </h2>
+            <p class="text-xs text-slate-500">Database ruas jalan kabupaten, jembatan, dan saluran drainase Dinas PUPR.</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button onclick="openModal('modalAddAsset')" class="px-4 py-2 bg-[#123B5D] hover:bg-blue-900 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow transition">
+              <i data-lucide="plus" class="w-4 h-4"></i> Tambah Data Aset
+            </button>
+            <button onclick="exportAssetsToCSV()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition">
+              <i data-lucide="download" class="w-4 h-4"></i> Ekspor CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter category subtabs -->
+        <div class="flex items-center justify-between flex-wrap gap-3 pt-3">
+          <div class="flex items-center gap-2 text-xs font-semibold">
+            <button onclick="filterAssetTab('all')" id="btn-tab-all" class="px-3 py-1.5 rounded-lg bg-[#123B5D] text-white">Semua Aset</button>
+            <button onclick="filterAssetTab('jalan')" id="btn-tab-jalan" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200">🛣️ Jalan Kabupaten</button>
+            <button onclick="filterAssetTab('jembatan')" id="btn-tab-jembatan" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200">🌉 Jembatan</button>
+            <button onclick="filterAssetTab('drainase')" id="btn-tab-drainase" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200">🌊 Drainase</button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <div class="relative">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+              <input type="text" id="searchAssetInput" onkeyup="renderAssetTable()" placeholder="Cari nama, kode ruas..." class="pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1685B9] w-56">
+            </div>
+          </div>
+        </div>
+
+        <!-- Assets Table -->
+        <div class="overflow-x-auto mt-4 rounded-xl border border-slate-200">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-semibold text-[11px] border-b border-slate-200">
+              <tr>
+                <th class="p-3">Kode Aset</th>
+                <th class="p-3">Nama Infrastruktur</th>
+                <th class="p-3">Kategori</th>
+                <th class="p-3">Kecamatan / Desa</th>
+                <th class="p-3">Dimensi Fisik</th>
+                <th class="p-3">Kondisi Terakhir</th>
+                <th class="p-3">Koordinat GIS</th>
+                <th class="p-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="assetTableBody" class="divide-y divide-slate-100 text-slate-700">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 4. LAPOR KERUSAKAN (PORTAL MASYARAKAT) -->
+    <section id="view-aduan" class="tab-view hidden space-y-6">
+      
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm max-w-4xl mx-auto">
+        <div class="border-b border-slate-100 pb-4 mb-6">
+          <div class="flex items-center gap-2 text-[#123B5D]">
+            <i data-lucide="megaphone" class="w-6 h-6 text-[#1685B9]"></i>
+            <h2 class="text-xl font-black">Formulir Pengaduan Kerusakan Infrastruktur</h2>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">
+            Laporan Anda akan langsung masuk ke antrean verifikasi Dinas PUPR Kabupaten Pesawaran dan mendapatkan nomor tiket pelacakan otomatis.
+          </p>
+        </div>
+
+        <form id="reportForm" onsubmit="submitDamageReport(event)" class="space-y-5">
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Nama Pelapor -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap Pelapor <span class="text-red-500">*</span></label>
+              <input type="text" id="reportName" required placeholder="Contoh: Ahmad Subagyo" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#1685B9]">
+            </div>
+
+            <!-- Kontak Pelapor -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Nomor WhatsApp / HP Aktif <span class="text-red-500">*</span></label>
+              <input type="tel" id="reportPhone" required placeholder="Contoh: 081234567890" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#1685B9]">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Jenis Infrastruktur -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Kategori Objek <span class="text-red-500">*</span></label>
+              <select id="reportCategory" required class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#1685B9]">
+                <option value="jalan">🛣️ Jalan Kabupaten</option>
+                <option value="jembatan">🌉 Jembatan / Gorong-gorong</option>
+                <option value="drainase">🌊 Saluran Drainase</option>
+              </select>
+            </div>
+
+            <!-- Kecamatan -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Kecamatan <span class="text-red-500">*</span></label>
+              <select id="reportKecamatan" required class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#1685B9]">
+                <option value="Gedong Tataan">Gedong Tataan</option>
+                <option value="Kedondong">Kedondong</option>
+                <option value="Way Lima">Way Lima</option>
+                <option value="Padang Cermin">Padang Cermin</option>
+                <option value="Teluk Pandan">Teluk Pandan</option>
+                <option value="Punduh Pedada">Punduh Pedada</option>
+                <option value="Negeri Katon">Negeri Katon</option>
+                <option value="Tegineneng">Tegineneng</option>
+                <option value="Way Ratai">Way Ratai</option>
+                <option value="Way Khilau">Way Khilau</option>
+                <option value="Marga Punduh">Marga Punduh</option>
+              </select>
+            </div>
+
+            <!-- Tingkat Keparahan -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Tingkat Kerusakan <span class="text-red-500">*</span></label>
+              <select id="reportSeverity" required class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#1685B9]">
+                <option value="ringan">Rusak Ringan (Retak rambut, genangan kecil)</option>
+                <option value="sedang">Rusak Sedang (Lubang dangkal, sedimentasi)</option>
+                <option value="berat">Rusak Berat (Amblas parah, jembatan retak)</option>
+                <option value="kritis">Kritis / Darurat (Putus total / bahaya jiwa)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Detail Lokasi -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Lokasi Rinci / Patokan Terdekat <span class="text-red-500">*</span></label>
+            <input type="text" id="reportLocationDetail" required placeholder="Contoh: Depan Kantor Desa Sukadadi, 200 meter sebelah timur jembatan" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#1685B9]">
+          </div>
+
+          <!-- Deskripsi Kerusakan -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Uraian Dampak & Kerusakan <span class="text-red-500">*</span></label>
+            <textarea id="reportDescription" rows="3" required placeholder="Jelaskan ukuran lubang/kerusakan, kendala akses warga atau kendaraan, dan sudah berapa lama terjadi..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#1685B9]"></textarea>
+          </div>
+
+          <!-- Koordinat & Lokasi GPS -->
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <i data-lucide="crosshair" class="w-4 h-4 text-[#1685B9]"></i> Titik Koordinat Lokasi GIS
+                </span>
+                <p class="text-[11px] text-slate-500">Gunakan GPS perangkat Anda atau ketik manual koordinat WGS84.</p>
+              </div>
+              <button type="button" onclick="getCurrentLocation()" class="px-3 py-1.5 bg-[#1685B9] hover:bg-sky-700 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm transition">
+                <i data-lucide="navigation" class="w-3.5 h-3.5"></i> Ambil GPS Saat Ini
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600">Latitude</label>
+                <input type="number" step="any" id="reportLat" value="-5.38520" required class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600">Longitude</label>
+                <input type="number" step="any" id="reportLng" value="105.18530" required class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white">
+              </div>
+            </div>
+          </div>
+
+          <!-- Upload Foto Bukti -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Foto Bukti Kerusakan Fisik <span class="text-red-500">*</span></label>
+            <div class="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 transition cursor-pointer" onclick="document.getElementById('reportFileInput').click()">
+              <input type="file" id="reportFileInput" accept="image/*" class="hidden" onchange="previewReportImage(event)">
+              <div id="imagePreviewContainer" class="flex flex-col items-center justify-center gap-1">
+                <i data-lucide="camera" class="w-8 h-8 text-slate-400"></i>
+                <p class="text-xs font-semibold text-slate-600">Klik untuk mengambil foto atau unggah dari galeri</p>
+                <p class="text-[10px] text-slate-400">Format: JPG, PNG (Maksimal 5MB)</p>
+              </div>
+              <img id="imagePreview" class="hidden max-h-48 mx-auto rounded-lg shadow-sm mt-2 object-cover">
+            </div>
+          </div>
+
+          <div class="pt-2 flex items-center justify-end gap-3">
+            <button type="reset" class="px-4 py-2 border border-slate-300 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-100 transition">
+              Reset Form
+            </button>
+            <button type="submit" class="px-6 py-2.5 bg-[#123B5D] hover:bg-blue-900 text-white text-xs font-bold rounded-xl shadow flex items-center gap-2 transition">
+              <i data-lucide="send" class="w-4 h-4"></i> Kirim Laporan Sekarang
+            </button>
+          </div>
+
+        </form>
+      </div>
+
+    </section>
+
+    <!-- 5. LACAK TIKET LAPORAN (TRACKING VIEW) -->
+    <section id="view-tracking" class="tab-view hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm max-w-3xl mx-auto">
+        <div class="text-center pb-6 border-b border-slate-100">
+          <div class="w-12 h-12 bg-sky-50 text-[#1685B9] rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <i data-lucide="search" class="w-6 h-6"></i>
+          </div>
+          <h2 class="text-xl font-black text-slate-800">Pelacakan Status Pengaduan Infrastruktur</h2>
+          <p class="text-xs text-slate-500 mt-1">Masukkan Nomor Tiket Aduan Anda untuk melihat transparansi proses penanganan.</p>
+          
+          <div class="flex items-center gap-2 max-w-md mx-auto mt-4">
+            <input type="text" id="trackTicketInput" placeholder="Contoh: TIK-PSW-2026-0814" class="flex-1 px-4 py-2.5 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#1685B9] uppercase font-bold tracking-wider">
+            <button onclick="performTracking()" class="px-5 py-2.5 bg-[#123B5D] text-white text-xs font-bold rounded-xl hover:bg-blue-900 transition flex items-center gap-1.5 shadow">
+              <i data-lucide="arrow-right" class="w-4 h-4"></i> Lacak
+            </button>
+          </div>
+        </div>
+
+        <!-- Tracking Result Card -->
+        <div id="trackingResult" class="hidden mt-6 space-y-6">
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <span class="text-[10px] uppercase font-bold text-slate-400">Nomor Tiket</span>
+              <h3 class="text-base font-black text-[#123B5D]" id="trackResultTicket">-</h3>
+              <p class="text-xs text-slate-600 mt-0.5" id="trackResultTitle">-</p>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] uppercase font-bold text-slate-400">Status Saat Ini</span>
+              <div id="trackResultBadge">-</div>
+            </div>
+          </div>
+
+          <!-- Step Progression Timeline -->
+          <div>
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-4">Tahapan Penanganan</h4>
+            <div class="space-y-4 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-slate-200">
+              
+              <!-- Step 1: Diajukan -->
+              <div class="flex items-start gap-4 relative">
+                <div class="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold z-10">1</div>
+                <div>
+                  <h5 class="text-xs font-bold text-slate-800">Laporan Diterima Sistem</h5>
+                  <p class="text-[11px] text-slate-500" id="step1Date">Tercatat secara digital dengan nomor tiket.</p>
+                </div>
+              </div>
+
+              <!-- Step 2: Verifikasi OPD -->
+              <div class="flex items-start gap-4 relative">
+                <div id="step2Icon" class="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold z-10">2</div>
+                <div>
+                  <h5 class="text-xs font-bold text-slate-800">Verifikasi Teknis Dinas PUPR</h5>
+                  <p class="text-[11px] text-slate-500" id="step2Desc">Pemeriksaan bukti foto, kewenangan jalan, dan tingkat urgensi.</p>
+                </div>
+              </div>
+
+              <!-- Step 3: Inspeksi Lapangan -->
+              <div class="flex items-start gap-4 relative">
+                <div id="step3Icon" class="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold z-10">3</div>
+                <div>
+                  <h5 class="text-xs font-bold text-slate-800">Inspeksi & Pemetaan Lapangan</h5>
+                  <p class="text-[11px] text-slate-500" id="step3Desc">Petugas lapangan melakukan validasi dimensi dan kondisi fisik.</p>
+                </div>
+              </div>
+
+              <!-- Step 4: Pengerjaan Pemeliharaan -->
+              <div class="flex items-start gap-4 relative">
+                <div id="step4Icon" class="w-7 h-7 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center text-xs font-bold z-10">4</div>
+                <div>
+                  <h5 class="text-xs font-bold text-slate-800">Pekerjaan Perbaikan Fisik</h5>
+                  <p class="text-[11px] text-slate-500" id="step4Desc">Penerbitan Surat Perintah Kerja (SPK) dan pelaksanaan perbaikan.</p>
+                </div>
+              </div>
+
+              <!-- Step 5: Selesai -->
+              <div class="flex items-start gap-4 relative">
+                <div id="step5Icon" class="w-7 h-7 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold z-10">5</div>
+                <div>
+                  <h5 class="text-xs font-bold text-slate-800">Selesai & Berita Acara</h5>
+                  <p class="text-[11px] text-slate-500" id="step5Desc">Pekerjaan diverifikasi selesai dan ditutup.</p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. VERIFIKASI & PENUGASAN SPK (OPD VIEW) -->
+    <section id="view-verifikasi" class="tab-view hidden space-y-4">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
+            <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="check-square" class="w-6 h-6 text-[#1685B9]"></i>
+              Antrean Verifikasi Aduan & Penerbitan Penugasan (SPK)
+            </h2>
+            <p class="text-xs text-slate-500">Panel kendali Dinas PUPR untuk memvalidasi kelayakan aduan dan menugaskan tim lapangan.</p>
+          </div>
+          <div class="text-xs font-semibold px-3 py-1 bg-amber-50 text-amber-700 rounded-lg border border-amber-200">
+            Kewenangan: Tim Verifikator Bidang Bina Marga & SDA
+          </div>
+        </div>
+
+        <div class="overflow-x-auto mt-4 rounded-xl border border-slate-200">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-semibold text-[11px] border-b border-slate-200">
+              <tr>
+                <th class="p-3">Tiket / Tanggal</th>
+                <th class="p-3">Pelapor</th>
+                <th class="p-3">Kategori / Lokasi</th>
+                <th class="p-3">Deskripsi Dampak</th>
+                <th class="p-3">Urgensi</th>
+                <th class="p-3">Status</th>
+                <th class="p-3 text-right">Tindakan Verifikasi</th>
+              </tr>
+            </thead>
+            <tbody id="verifikasiTableBody" class="divide-y divide-slate-100 text-slate-700">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 7. INSPEKSI LAPANGAN (PETUGAS LAPANGAN VIEW) -->
+    <section id="view-inspeksi" class="tab-view hidden space-y-4">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
+            <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="clipboard-check" class="w-6 h-6 text-[#123B5D]"></i>
+              Jadwal & Lembar Inspeksi Lapangan
+            </h2>
+            <p class="text-xs text-slate-500">Formulir pemeriksaan kondisi riil, checklist kerusakan, dan pengunggahan dokumentasi teknis.</p>
+          </div>
+          <button onclick="openModal('modalInspeksiChecklist')" class="px-3.5 py-2 bg-[#20A477] hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow transition">
+            <i data-lucide="file-plus" class="w-4 h-4"></i> Input Berita Acara Inspeksi
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4" id="inspectionCardsContainer">
+          <!-- Rendered via JS -->
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 8. MONITORING PROGRES PEMELIHARAAN -->
+    <section id="view-pemeliharaan" class="tab-view hidden space-y-4">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
+            <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="wrench" class="w-6 h-6 text-[#1685B9]"></i>
+              Monitoring Progres Pemeliharaan Fisik (SPK)
+            </h2>
+            <p class="text-xs text-slate-500">Pemantauan persentase pengerjaan, foto sebelum/sesudah, dan validasi penyelesaian pekerjaan.</p>
+          </div>
+          <div class="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+            Total Anggaran Berjalan: Rp 1.450.000.000 (Simulasi)
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4" id="maintenanceProjectsContainer">
+          <!-- Rendered via JS -->
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 9. STATISTIK & ANALISIS KONDISI -->
+    <section id="view-statistik" class="tab-view hidden space-y-6">
+      
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Kondisi Jalan per Kecamatan -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 class="text-base font-bold text-slate-800 flex items-center gap-2 mb-1">
+            <i data-lucide="bar-chart-2" class="w-5 h-5 text-[#123B5D]"></i>
+            Distribusi Kondisi Jalan per Kecamatan
+          </h3>
+          <p class="text-xs text-slate-500 mb-4">Perbandingan persentase jalan mantap vs rusak di Kab. Pesawaran.</p>
+          <div class="h-64">
+            <canvas id="chartKecamatan"></canvas>
+          </div>
+        </div>
+
+        <!-- Tren Aduan & Penyelesaian -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 class="text-base font-bold text-slate-800 flex items-center gap-2 mb-1">
+            <i data-lucide="trending-up" class="w-5 h-5 text-[#20A477]"></i>
+            Tren Aduan Masuk vs Tuntas Bulanan (2026)
+          </h3>
+          <p class="text-xs text-slate-500 mb-4">Tingkat responsivitas penyelesaian masalah infrastruktur.</p>
+          <div class="h-64">
+            <canvas id="chartTren"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Kinerja Ringkasan -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <h3 class="text-base font-bold text-slate-800 mb-3">Tabel Ringkasan Statistik Kondisi Infrastruktur</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-semibold text-[11px] border-b border-slate-200">
+              <tr>
+                <th class="p-3">Kecamatan</th>
+                <th class="p-3">Total Jalan (km)</th>
+                <th class="p-3">Mantap (%)</th>
+                <th class="p-3">Jembatan (Unit)</th>
+                <th class="p-3">Drainase (km)</th>
+                <th class="p-3">Aduan Masuk</th>
+                <th class="p-3">Status Penanganan</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-700">
+              <tr>
+                <td class="p-3 font-bold text-[#123B5D]">Gedong Tataan</td>
+                <td class="p-3">68.4 km</td>
+                <td class="p-3 font-semibold text-emerald-600">84.2%</td>
+                <td class="p-3">12 Unit</td>
+                <td class="p-3">24.5 km</td>
+                <td class="p-3">14</td>
+                <td class="p-3"><span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md font-bold">Terkendali</span></td>
+              </tr>
+              <tr>
+                <td class="p-3 font-bold text-[#123B5D]">Kedondong</td>
+                <td class="p-3">54.2 km</td>
+                <td class="p-3 font-semibold text-amber-600">68.5%</td>
+                <td class="p-3">9 Unit</td>
+                <td class="p-3">16.2 km</td>
+                <td class="p-3">9</td>
+                <td class="p-3"><span class="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-md font-bold">Dalam Tindak Lanjut</span></td>
+              </tr>
+              <tr>
+                <td class="p-3 font-bold text-[#123B5D]">Way Lima</td>
+                <td class="p-3">49.0 km</td>
+                <td class="p-3 font-semibold text-emerald-600">79.0%</td>
+                <td class="p-3">7 Unit</td>
+                <td class="p-3">14.1 km</td>
+                <td class="p-3">6</td>
+                <td class="p-3"><span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md font-bold">Terkendali</span></td>
+              </tr>
+              <tr>
+                <td class="p-3 font-bold text-[#123B5D]">Padang Cermin</td>
+                <td class="p-3">62.8 km</td>
+                <td class="p-3 font-semibold text-emerald-600">74.6%</td>
+                <td class="p-3">11 Unit</td>
+                <td class="p-3">19.8 km</td>
+                <td class="p-3">8</td>
+                <td class="p-3"><span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md font-bold">Terkendali</span></td>
+              </tr>
+              <tr>
+                <td class="p-3 font-bold text-[#123B5D]">Teluk Pandan</td>
+                <td class="p-3">42.1 km</td>
+                <td class="p-3 font-semibold text-emerald-600">82.1%</td>
+                <td class="p-3">8 Unit</td>
+                <td class="p-3">12.0 km</td>
+                <td class="p-3">5</td>
+                <td class="p-3"><span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md font-bold">Terkendali</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 10. EKSPOR LAPORAN (PDF / EXCEL) -->
+    <section id="view-ekspor" class="tab-view hidden space-y-6">
+      
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm max-w-4xl mx-auto">
+        <div class="border-b border-slate-100 pb-4 mb-6">
+          <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <i data-lucide="printer" class="w-6 h-6 text-[#123B5D]"></i>
+            Pusat Cetak & Ekspor Dokumen Resmi
+          </h2>
+          <p class="text-xs text-slate-500 mt-1">
+            Ekspor rekapitulasi data infrastruktur dan tindak lanjut aduan dalam format cetak resmi PDF (Berkop Dinas PUPR) atau spreadsheet Excel.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-xs">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Jenis Laporan</label>
+            <select id="exportType" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+              <option value="aset">Laporan Inventarisasi Seluruh Aset</option>
+              <option value="aduan">Laporan Aduan Masyarakat & Penanganan</option>
+              <option value="spk">Laporan Realisasi Proyek Pemeliharaan</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Kecamatan</label>
+            <select id="exportKecamatan" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+              <option value="all">Semua Kecamatan (Kabupaten)</option>
+              <option value="Gedong Tataan">Gedong Tataan</option>
+              <option value="Kedondong">Kedondong</option>
+              <option value="Way Lima">Way Lima</option>
+              <option value="Padang Cermin">Padang Cermin</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Tahun Anggaran</label>
+            <select id="exportTahun" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+              <option value="2026">2026 (Tahun Berjalan)</option>
+              <option value="2025">2025</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <button onclick="printFormalReport()" class="px-5 py-2.5 bg-[#123B5D] hover:bg-blue-900 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow transition">
+            <i data-lucide="printer" class="w-4 h-4"></i> Cetak / Simpan PDF Resmi
+          </button>
+          <button onclick="exportAssetsToCSV()" class="px-5 py-2.5 bg-[#20A477] hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow transition">
+            <i data-lucide="sheet" class="w-4 h-4"></i> Unduh File Excel (.CSV)
+          </button>
+        </div>
+
+        <!-- Preview Container -->
+        <div class="mt-8 border border-slate-200 rounded-xl p-6 bg-slate-50/50">
+          <div class="text-center border-b border-slate-300 pb-4 mb-4">
+            <div class="flex items-center justify-center gap-4 mb-2">
+              <img src="./public/assets/branding/pesawaran.svg" class="h-12 w-auto" alt="Pesawaran">
+              <div>
+                <h4 class="text-sm font-extrabold text-[#123B5D] uppercase tracking-wide">Pemerintah Kabupaten Pesawaran</h4>
+                <h5 class="text-xs font-bold text-slate-800 uppercase">Dinas Pekerjaan Umum dan Penataan Ruang</h5>
+                <p class="text-[10px] text-slate-500">Komplek Perkantoran Pemkab Pesawaran, Gedong Tataan, Lampung 35366</p>
+              </div>
+              <img src="./public/assets/branding/teknokrat.svg" class="h-12 w-auto" alt="Teknokrat">
+            </div>
+            <p class="text-xs font-bold text-slate-800 uppercase underline tracking-wider">REKAPITULASI MONITORING KONDISI INFRASTRUKTUR DAERAH</p>
+            <p class="text-[10px] text-slate-500">Nomor: 600/PUPR-PSW/SIM/2026 &bull; Tanggal: 10 November 2026</p>
+          </div>
+
+          <p class="text-xs text-slate-600 mb-3">Berikut adalah ringkasan mutasi kondisi jalan, jembatan, dan drainase hasil pengolahan SIM-PESAWARAN:</p>
+          <div class="overflow-x-auto text-xs">
+            <table class="w-full text-left bg-white border border-slate-200 rounded-lg">
+              <thead class="bg-slate-100 text-slate-700 font-bold border-b">
+                <tr>
+                  <th class="p-2">Kategori</th>
+                  <th class="p-2">Total Kuantitas</th>
+                  <th class="p-2">Mantap / Baik</th>
+                  <th class="p-2">Rusak Ringan/Sedang</th>
+                  <th class="p-2">Rusak Berat</th>
+                  <th class="p-2">Tingkat Kemantapan</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y text-slate-600">
+                <tr>
+                  <td class="p-2 font-semibold">Ruas Jalan Kabupaten</td>
+                  <td class="p-2">482.5 km (38 Ruas)</td>
+                  <td class="p-2">368.6 km</td>
+                  <td class="p-2">78.4 km</td>
+                  <td class="p-2">35.5 km</td>
+                  <td class="p-2 font-bold text-emerald-600">76.4%</td>
+                </tr>
+                <tr>
+                  <td class="p-2 font-semibold">Jembatan & Culvert</td>
+                  <td class="p-2">64 Unit</td>
+                  <td class="p-2">59 Unit</td>
+                  <td class="p-2">4 Unit</td>
+                  <td class="p-2">1 Unit</td>
+                  <td class="p-2 font-bold text-emerald-600">92.2%</td>
+                </tr>
+                <tr>
+                  <td class="p-2 font-semibold">Jaringan Drainase Primer</td>
+                  <td class="p-2">128.4 km</td>
+                  <td class="p-2">98.2 km</td>
+                  <td class="p-2">22.1 km</td>
+                  <td class="p-2">8.1 km</td>
+                  <td class="p-2 font-bold text-emerald-600">76.5%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Signature box -->
+          <div class="mt-8 flex justify-end text-right text-xs">
+            <div class="w-64 text-center">
+              <p class="text-slate-500">Gedong Tataan, 10 November 2026</p>
+              <p class="font-bold text-slate-800 mt-1">Kepala Dinas PUPR Kab. Pesawaran</p>
+              <div class="h-16 flex items-center justify-center text-[10px] text-slate-400 italic">
+                (Tanda Tangan Digital Tersertifikasi)
+              </div>
+              <p class="font-bold text-slate-800 underline">Ir. H. Zainal Abidin, M.T.</p>
+              <p class="text-[10px] text-slate-500">NIP. 19740512 199903 1 004</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- 11. PENGGUNA & AUDIT TRAIL -->
+    <section id="view-pengguna" class="tab-view hidden space-y-6">
+      
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- User Accounts Management -->
+        <div class="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                <i data-lucide="users" class="w-5 h-5 text-[#123B5D]"></i>
+                Manajemen Pengguna & Hak Akses (RBAC)
+              </h3>
+              <p class="text-xs text-slate-500">Pengaturan akses Administrator, Verifikator OPD, dan Petugas Lapangan.</p>
+            </div>
+            <button onclick="showToast('Aksi simulasi: Menambah akun pengguna baru.')" class="px-3 py-1.5 bg-[#123B5D] text-white text-xs font-bold rounded-lg shadow">
+              + Akun Baru
+            </button>
+          </div>
+
+          <div class="overflow-x-auto mt-3">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-600 uppercase font-semibold text-[11px] border-b">
+                <tr>
+                  <th class="p-2.5">Nama & Username</th>
+                  <th class="p-2.5">Role</th>
+                  <th class="p-2.5">Instansi</th>
+                  <th class="p-2.5">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y text-slate-700">
+                <tr>
+                  <td class="p-2.5 font-bold text-[#123B5D]">Angga Rohmad Adi Saputra (admin)</td>
+                  <td class="p-2.5"><span class="px-2 py-0.5 bg-blue-50 text-blue-800 font-bold rounded">Administrator</span></td>
+                  <td class="p-2.5">Dinas PUPR Pesawaran</td>
+                  <td class="p-2.5"><span class="text-emerald-600 font-bold">● Aktif</span></td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-bold text-[#123B5D]">Dr. Erliyan Redy Susanto, M.Kom (erliyan)</td>
+                  <td class="p-2.5"><span class="px-2 py-0.5 bg-sky-50 text-sky-800 font-bold rounded">Supervisor / Peneliti</span></td>
+                  <td class="p-2.5">Universitas Teknokrat Indonesia</td>
+                  <td class="p-2.5"><span class="text-emerald-600 font-bold">● Aktif</span></td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-bold text-[#123B5D]">Hendra Wijaya, S.T. (opd_pupr)</td>
+                  <td class="p-2.5"><span class="px-2 py-0.5 bg-indigo-50 text-indigo-800 font-bold rounded">Verifikator OPD</span></td>
+                  <td class="p-2.5">Bidang Bina Marga PUPR</td>
+                  <td class="p-2.5"><span class="text-emerald-600 font-bold">● Aktif</span></td>
+                </tr>
+                <tr>
+                  <td class="p-2.5 font-bold text-[#123B5D]">Rizki Pratama (surveyor_01)</td>
+                  <td class="p-2.5"><span class="px-2 py-0.5 bg-emerald-50 text-emerald-800 font-bold rounded">Petugas Lapangan</span></td>
+                  <td class="p-2.5">Tim Reaksi Cepat PUPR</td>
+                  <td class="p-2.5"><span class="text-emerald-600 font-bold">● Aktif</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Audit Trail Log -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 class="text-base font-bold text-slate-800 flex items-center gap-2 mb-1">
+            <i data-lucide="shield-alert" class="w-5 h-5 text-amber-500"></i>
+            Audit Trail Aktivitas
+          </h3>
+          <p class="text-xs text-slate-500 mb-3">Pencatatan riwayat perubahan sistem yang tidak dapat diubah.</p>
+          
+          <div class="space-y-3 text-xs overflow-y-auto max-h-80 pr-1">
+            <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span>10 Nov 2026 - 18:25 WIB</span>
+                <span class="text-emerald-600 font-bold">SPK_ISSUED</span>
+              </div>
+              <p class="text-slate-800 font-semibold mt-0.5">Penerbitan SPK-PSW-2026-004 oleh Verifikator OPD</p>
+              <p class="text-[11px] text-slate-500">Objek: Rekonstruksi Jembatan Way Semah I</p>
+            </div>
+            <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span>10 Nov 2026 - 17:10 WIB</span>
+                <span class="text-blue-600 font-bold">REPORT_SUBMITTED</span>
+              </div>
+              <p class="text-slate-800 font-semibold mt-0.5">Aduan TIK-PSW-2026-0814 diterima dari warga</p>
+              <p class="text-[11px] text-slate-500">Objek: Jl. Ahmad Yani Sukadadi (Lubang Jalan)</p>
+            </div>
+            <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span>10 Nov 2026 - 14:02 WIB</span>
+                <span class="text-amber-600 font-bold">INSPECTION_UPDATE</span>
+              </div>
+              <p class="text-slate-800 font-semibold mt-0.5">Petugas mengunggah berita acara survei lapangan</p>
+              <p class="text-[11px] text-slate-500">Objek: Drainase Primer Way Lima</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL: TAMBAH / EDIT ASET -->
+  <div id="modalAddAsset" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b pb-3">
+        <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+          <i data-lucide="plus-circle" class="w-5 h-5 text-[#123B5D]"></i>
+          Tambah Aset Infrastruktur Baru
+        </h3>
+        <button onclick="closeModal('modalAddAsset')" class="text-slate-400 hover:text-slate-700">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="addAssetForm" onsubmit="saveNewAsset(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Kode Ruas / Registrasi</label>
+          <input type="text" id="newAssetCode" required placeholder="Contoh: JL-PSW-042" class="w-full px-3 py-2 border rounded-lg">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Nama Infrastruktur</label>
+          <input type="text" id="newAssetName" required placeholder="Contoh: Ruas Jalan Raya Kedondong - Way Lima" class="w-full px-3 py-2 border rounded-lg">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Kategori</label>
+            <select id="newAssetCategory" class="w-full px-3 py-2 border rounded-lg">
+              <option value="jalan">Jalan</option>
+              <option value="jembatan">Jembatan</option>
+              <option value="drainase">Drainase</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Kecamatan</label>
+            <select id="newAssetKecamatan" class="w-full px-3 py-2 border rounded-lg">
+              <option value="Gedong Tataan">Gedong Tataan</option>
+              <option value="Kedondong">Kedondong</option>
+              <option value="Way Lima">Way Lima</option>
+              <option value="Padang Cermin">Padang Cermin</option>
+              <option value="Teluk Pandan">Teluk Pandan</option>
+              <option value="Punduh Pedada">Punduh Pedada</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Panjang (m)</label>
+            <input type="number" id="newAssetLength" required value="2500" class="w-full px-3 py-2 border rounded-lg">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Lebar (m)</label>
+            <input type="number" id="newAssetWidth" step="0.1" required value="6.0" class="w-full px-3 py-2 border rounded-lg">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Kondisi</label>
+            <select id="newAssetCondition" class="w-full px-3 py-2 border rounded-lg">
+              <option value="mantap">Mantap</option>
+              <option value="sedang">Sedang</option>
+              <option value="rusak_ringan">Rusak Ringan</option>
+              <option value="rusak_berat">Rusak Berat</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Latitude</label>
+            <input type="number" step="any" id="newAssetLat" value="-5.4290" required class="w-full px-3 py-2 border rounded-lg">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Longitude</label>
+            <input type="number" step="any" id="newAssetLng" value="105.1780" required class="w-full px-3 py-2 border rounded-lg">
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t">
+          <button type="button" onclick="closeModal('modalAddAsset')" class="px-4 py-2 border rounded-lg">Batal</button>
+          <button type="submit" class="px-5 py-2 bg-[#123B5D] text-white font-bold rounded-lg shadow">Simpan Aset</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: PENUGASAN SPK VERIFIKASI -->
+  <div id="modalAssignSPK" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b pb-3">
+        <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+          <i data-lucide="file-check" class="w-5 h-5 text-[#20A477]"></i>
+          Verifikasi & Terbitkan SPK Penanganan
+        </h3>
+        <button onclick="closeModal('modalAssignSPK')" class="text-slate-400 hover:text-slate-700">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="p-3 bg-slate-50 rounded-lg">
+          <span class="text-[10px] text-slate-400 uppercase font-bold">Tiket Terpilih</span>
+          <p class="font-bold text-[#123B5D]" id="spkModalTicket">-</p>
+          <p class="text-slate-600 mt-0.5" id="spkModalDesc">-</p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Tim Penanganan / Petugas Lapangan</label>
+          <select id="spkAssignee" class="w-full px-3 py-2 border rounded-lg">
+            <option value="Tim Cepat Tanggap Bina Marga I">Tim Reaksi Cepat Bina Marga Wilayah I</option>
+            <option value="Tim Pemeliharaan Jembatan PUPR">Tim Khusus Pemeliharaan Jembatan PUPR</option>
+            <option value="Satgas Normalisasi Drainase">Satgas Drainase & Pengairan Pesawaran</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Tingkat Prioritas</label>
+          <select id="spkPriority" class="w-full px-3 py-2 border rounded-lg">
+            <option value="Tinggi">Tinggi (Maks. 3 Hari Kerja)</option>
+            <option value="Sedang">Sedang (Maks. 7 Hari Kerja)</option>
+            <option value="Rutin">Rutin Berkala (14 Hari Kerja)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Instruksi Khusus & Catatan Keselamatan</label>
+          <textarea id="spkInstruction" rows="2" class="w-full px-3 py-2 border rounded-lg" placeholder="Pasang rambu peringatan dan koordinasikan dengan aparat desa setempat..."></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t">
+          <button type="button" onclick="closeModal('modalAssignSPK')" class="px-4 py-2 border rounded-lg">Batal</button>
+          <button type="button" onclick="confirmIssueSPK()" class="px-5 py-2 bg-[#20A477] text-white font-bold rounded-lg shadow">Terbitkan SPK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mandatory Footer exact as per instructions -->
+  <footer class="w-full border-t border-slate-200 bg-white py-6 px-4 mt-auto">
+    <div class="max-w-7xl mx-auto flex flex-col items-center justify-center gap-4 text-center">
+      
+      <!-- Logos: Pesawaran (Kiri), Teknokrat (Kanan) -->
+      <div class="flex items-center gap-6">
+        <div class="flex items-center gap-2.5">
+          <img
+            src="./public/assets/branding/pesawaran.svg"
+            alt="Logo Resmi Kabupaten Pesawaran"
+            class="h-11 w-auto object-contain hover:scale-105 transition-transform"
+          />
+          <div class="text-left hidden sm:block">
+            <p class="text-[10px] font-bold text-slate-500 leading-tight">PEMERINTAH KABUPATEN</p>
+            <p class="text-xs font-black text-[#123B5D] tracking-wide">PESAWARAN</p>
+          </div>
+        </div>
+
+        <div class="h-8 w-px bg-slate-300"></div>
+
+        <div class="flex items-center gap-2.5">
+          <img
+            src="./public/assets/branding/teknokrat.svg"
+            alt="Logo Resmi Universitas Teknokrat Indonesia"
+            class="h-11 w-auto object-contain hover:scale-105 transition-transform"
+          />
+          <div class="text-left hidden sm:block">
+            <p class="text-[10px] font-bold text-slate-500 leading-tight">UNIVERSITAS TEKNOKRAT</p>
+            <p class="text-xs font-black text-[#1685B9] tracking-wide">INDONESIA</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Identity & Academic Collaboration note -->
+      <div class="space-y-0.5">
+        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          SIM-PESAWARAN &bull; Smart Infrastructure Monitoring
+        </p>
+        <p class="text-[11px] text-slate-400">
+          Sinergi Pemerintah Kabupaten Pesawaran (Dinas PUPR) bersama Mitra Akademik Universitas Teknokrat Indonesia
+        </p>
+      </div>
+
+      <!-- Exact Mandatory Copyright String -->
+      <p class="text-xs font-medium text-slate-600 bg-slate-100/90 px-4 py-1.5 rounded-full border border-slate-200">
+        Copyright©2026 by Angga Rohmad Adi Saputra dan Dr. Erliyan Redy Susanto, M.Kom
+      </p>
+    </div>
+  </footer>
+
+  <!-- Application Logic & Seed Data Scripts -->
+  <script>
+    // 1. Initial State & Seed Data (Demo Simulation)
+    let currentRole = 'administrator';
+    let assetsData = [
+      {
+        id: 1,
+        code: 'JL-PSW-001',
+        name: 'Ruas Jl. Ahmad Yani - Gedong Tataan',
+        category: 'jalan',
+        kecamatan: 'Gedong Tataan',
+        desa: 'Sukadadi',
+        condition: 'mantap',
+        lengthM: 5400,
+        widthM: 7.0,
+        surface: 'Hotmix Aspal',
+        year: 2023,
+        lat: -5.38520,
+        lng: 105.18530,
+        coords: [
+          [-5.3740, 105.1720],
+          [-5.3795, 105.1785],
+          [-5.3852, 105.1853],
+          [-5.3910, 105.1940],
+          [-5.3980, 105.2030]
+        ]
+      },
+      {
+        id: 2,
+        code: 'JL-PSW-004',
+        name: 'Ruas Jl. Raya Kedondong - Way Lima',
+        category: 'jalan',
+        kecamatan: 'Kedondong',
+        desa: 'Kedondong',
+        condition: 'sedang',
+        lengthM: 8200,
+        widthM: 6.0,
+        surface: 'Lapen / Aspal',
+        year: 2021,
+        lat: -5.44120,
+        lng: 105.02540,
+        coords: [
+          [-5.4320, 105.0120],
+          [-5.4412, 105.0254],
+          [-5.4510, 105.0440],
+          [-5.4600, 105.0650],
+          [-5.4678, 105.0851]
+        ]
+      },
+      {
+        id: 3,
+        code: 'JB-PSW-014',
+        name: 'Jembatan Way Semah I',
+        category: 'jembatan',
+        kecamatan: 'Kedondong',
+        desa: 'Kedondong',
+        condition: 'sedang',
+        lengthM: 36,
+        widthM: 6.5,
+        surface: 'Gelagar Baja & Beton',
+        year: 2019,
+        lat: -5.44850,
+        lng: 105.03210
+      },
+      {
+        id: 4,
+        code: 'DR-PSW-029',
+        name: 'Saluran Drainase Primer Way Lima',
+        category: 'drainase',
+        kecamatan: 'Way Lima',
+        desa: 'Kuta Dalom',
+        condition: 'rusak_ringan',
+        lengthM: 1250,
+        widthM: 2.0,
+        surface: 'Pasangan Batu Kali',
+        year: 2022,
+        lat: -5.46780,
+        lng: 105.08510,
+        coords: [
+          [-5.4610, 105.0740],
+          [-5.4678, 105.0851],
+          [-5.4745, 105.0960]
+        ]
+      },
+      {
+        id: 5,
+        code: 'JL-PSW-009',
+        name: 'Ruas Jl. Pesisir Teluk Pandan - Mutun',
+        category: 'jalan',
+        kecamatan: 'Teluk Pandan',
+        desa: 'Sukajaya Lempasing',
+        condition: 'mantap',
+        lengthM: 12400,
+        widthM: 8.0,
+        surface: 'Hotmix Kelas III',
+        year: 2024,
+        lat: -5.53520,
+        lng: 105.26810,
+        coords: [
+          [-5.5120, 105.2510],
+          [-5.5240, 105.2600],
+          [-5.5352, 105.2681],
+          [-5.5510, 105.2760],
+          [-5.5680, 105.2810]
+        ]
+      },
+      {
+        id: 6,
+        code: 'JB-PSW-022',
+        name: 'Jembatan Gantung Way Ratai',
+        category: 'jembatan',
+        kecamatan: 'Way Ratai',
+        desa: 'Wates',
+        condition: 'rusak_berat',
+        lengthM: 45,
+        widthM: 3.5,
+        surface: 'Rangka Baja',
+        year: 2017,
+        lat: -5.59500,
+        lng: 105.11500
+      },
+      {
+        id: 7,
+        code: 'JL-PSW-012',
+        name: 'Ruas Jl. Raya Tegineneng - Batas Lamteng',
+        category: 'jalan',
+        kecamatan: 'Tegineneng',
+        desa: 'Bumi Agung',
+        condition: 'mantap',
+        lengthM: 6800,
+        widthM: 7.5,
+        surface: 'Rigid Beton & Hotmix',
+        year: 2023,
+        lat: -5.22800,
+        lng: 105.19500,
+        coords: [
+          [-5.2120, 105.1840],
+          [-5.2280, 105.1950],
+          [-5.2410, 105.2060]
+        ]
+      },
+      {
+        id: 8,
+        code: 'JB-PSW-031',
+        name: 'Jembatan Way Sekampung Tegineneng',
+        category: 'jembatan',
+        kecamatan: 'Tegineneng',
+        desa: 'Rejomulyo',
+        condition: 'mantap',
+        lengthM: 60,
+        widthM: 8.0,
+        surface: 'Beton Prategang',
+        year: 2022,
+        lat: -5.23400,
+        lng: 105.19800
+      },
+      {
+        id: 9,
+        code: 'DR-PSW-011',
+        name: 'Drainase Perkotaan Gedong Tataan',
+        category: 'drainase',
+        kecamatan: 'Gedong Tataan',
+        desa: 'Kutoarjo',
+        condition: 'sedang',
+        lengthM: 1800,
+        widthM: 2.5,
+        surface: 'U-Ditch Beton Precast',
+        year: 2023,
+        lat: -5.38100,
+        lng: 105.18200,
+        coords: [
+          [-5.3750, 105.1760],
+          [-5.3810, 105.1820],
+          [-5.3880, 105.1890]
+        ]
+      },
+      {
+        id: 10,
+        code: 'JL-PSW-018',
+        name: 'Ruas Jl. Padang Cermin - Pantai Klara',
+        category: 'jalan',
+        kecamatan: 'Padang Cermin',
+        desa: 'Hanasana',
+        condition: 'sedang',
+        lengthM: 9500,
+        widthM: 6.5,
+        surface: 'Hotmix Aspal',
+        year: 2020,
+        lat: -5.58900,
+        lng: 105.21500,
+        coords: [
+          [-5.5720, 105.2010],
+          [-5.5890, 105.2150],
+          [-5.6080, 105.2290]
+        ]
+      },
+      {
+        id: 11,
+        code: 'JB-PSW-045',
+        name: 'Jembatan Way Ratai Baru',
+        category: 'jembatan',
+        kecamatan: 'Way Ratai',
+        desa: 'Gunung Rejo',
+        condition: 'sedang',
+        lengthM: 40,
+        widthM: 7.0,
+        surface: 'Gelagar Baja',
+        year: 2018,
+        lat: -5.58800,
+        lng: 105.10500
+      },
+      {
+        id: 12,
+        code: 'DR-PSW-042',
+        name: 'Saluran Pembuang Punduh Pedada',
+        category: 'drainase',
+        kecamatan: 'Punduh Pedada',
+        desa: 'Bawang',
+        condition: 'rusak_berat',
+        lengthM: 950,
+        widthM: 1.8,
+        surface: 'Batu Belah Tanpa Pasir',
+        year: 2016,
+        lat: -5.72000,
+        lng: 105.24500,
+        coords: [
+          [-5.7130, 105.2380],
+          [-5.7200, 105.2450],
+          [-5.7290, 105.2530]
+        ]
+      }
+    ];
+
+    let reportsData = [
+      {
+        id: 1,
+        ticket: 'TIK-PSW-2026-0814',
+        name: 'Budi Santoso',
+        phone: '0812-7890-4321',
+        category: 'jalan',
+        kecamatan: 'Gedong Tataan',
+        desa: 'Sukadadi',
+        location: 'Depan Pasar Tradisional Sukadadi km 2',
+        description: 'Lubang jalan sedalam 20cm melebar akibat genangan air hujan, membahayakan pengendara motor.',
+        severity: 'berat',
+        status: 'in_progress',
+        lat: -5.38520,
+        lng: 105.18530,
+        date: '10 Nov 2026',
+        spk: 'SPK-PSW-2026-004'
+      },
+      {
+        id: 2,
+        ticket: 'TIK-PSW-2026-0819',
+        name: 'Siti Aminah',
+        phone: '0821-4567-8910',
+        category: 'drainase',
+        kecamatan: 'Way Lima',
+        desa: 'Kuta Dalom',
+        location: 'Saluran samping SDN 1 Way Lima',
+        description: 'Sedimentasi tebal dan tanggul retak menyebabkan luapan air ke halaman sekolah.',
+        severity: 'sedang',
+        status: 'under_review',
+        lat: -5.46780,
+        lng: 105.08510,
+        date: '10 Nov 2026'
+      },
+      {
+        id: 3,
+        ticket: 'TIK-PSW-2026-0792',
+        name: 'I Wayan Sudarma',
+        phone: '0853-1122-3344',
+        category: 'jembatan',
+        kecamatan: 'Way Ratai',
+        desa: 'Wates',
+        location: 'Jembatan penghubung desa Wates',
+        description: 'Baut penyangga lantai jembatan longgar dan pagar pembatas patah.',
+        severity: 'kritis',
+        status: 'inspection_scheduled',
+        lat: -5.59500,
+        lng: 105.11500,
+        date: '09 Nov 2026'
+      },
+      {
+        id: 4,
+        ticket: 'TIK-PSW-2026-0825',
+        name: 'Hendra Gunawan',
+        phone: '0813-9988-7766',
+        category: 'jalan',
+        kecamatan: 'Teluk Pandan',
+        desa: 'Sukajaya Lempasing',
+        location: 'Dekat Tikungan Pantai Mutun',
+        description: 'Aspal amblas sepanjang 15 meter akibat abrasi pantai dan arus pasang air laut.',
+        severity: 'berat',
+        status: 'submitted',
+        lat: -5.53900,
+        lng: 105.27100,
+        date: '10 Nov 2026'
+      }
+    ];
+
+    let maintenanceProjects = [
+      {
+        id: 1,
+        spk: 'SPK-PSW-2026-004',
+        title: 'Penambalan Lubang & Pengaspalan Jl. Ahmad Yani',
+        category: 'jalan',
+        kecamatan: 'Gedong Tataan',
+        team: 'Tim Cepat Tanggap Bina Marga I',
+        progress: 65,
+        status: 'Pengerjaan 70%',
+        target: '15 Nov 2026',
+        budget: 'Rp 45.000.000'
+      },
+      {
+        id: 2,
+        spk: 'SPK-PSW-2026-002',
+        title: 'Normalisasi & Pengerukan Sedimen Drainase Way Lima',
+        category: 'drainase',
+        kecamatan: 'Way Lima',
+        team: 'Satgas Normalisasi Drainase',
+        progress: 90,
+        status: 'Uji Kelayakan',
+        target: '12 Nov 2026',
+        budget: 'Rp 28.500.000'
+      }
+    ];
+
+    // 11 Kecamatan Coordinates for Kabupaten Pesawaran
+    const KECAMATAN_CENTERS = {
+      'Gedong Tataan': { lat: -5.3850, lng: 105.1850, zoom: 13, code: '18.09.01' },
+      'Kedondong': { lat: -5.4410, lng: 105.0250, zoom: 13, code: '18.09.02' },
+      'Way Lima': { lat: -5.4670, lng: 105.0850, zoom: 13, code: '18.09.03' },
+      'Padang Cermin': { lat: -5.5890, lng: 105.2150, zoom: 13, code: '18.09.04' },
+      'Teluk Pandan': { lat: -5.5350, lng: 105.2680, zoom: 13, code: '18.09.05' },
+      'Punduh Pedada': { lat: -5.7200, lng: 105.2450, zoom: 13, code: '18.09.06' },
+      'Negeri Katon': { lat: -5.2950, lng: 105.1550, zoom: 13, code: '18.09.07' },
+      'Tegineneng': { lat: -5.2280, lng: 105.1950, zoom: 13, code: '18.09.08' },
+      'Way Ratai': { lat: -5.5950, lng: 105.1150, zoom: 13, code: '18.09.09' },
+      'Way Khilau': { lat: -5.4200, lng: 104.9750, zoom: 13, code: '18.09.10' },
+      'Marga Punduh': { lat: -5.6700, lng: 105.1850, zoom: 13, code: '18.09.11' }
+    };
+
+    // Maps instances & storage
+    let miniMap, fullMap;
+    let fullMapMarkers = [];
+    let miniMapMarkers = [];
+    let selectionMarker = null;
+
+    // Basemaps dictionary
+    let baseLayers = {};
+    let currentBaseMap = 'osm';
+
+    // Initialize on window load
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      initMiniMap();
+      renderDashboardFeed();
+      renderAssetTable();
+      renderVerifikasiTable();
+      renderInspectionCards();
+      renderMaintenanceProjects();
+      initCharts();
+    });
+
+    // Auto-resize Leaflet on window resize
+    window.addEventListener('resize', () => {
+      if (fullMap) fullMap.invalidateSize();
+      if (miniMap) miniMap.invalidateSize();
+    });
+
+    // Navigation Switcher with Auto Invalidation
+    function navigateTo(tabName) {
+      document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
+      const activeSection = document.getElementById(`view-${tabName}`);
+      if (activeSection) activeSection.classList.remove('hidden');
+
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        if (btn.dataset.tab === tabName) {
+          btn.classList.add('bg-[#1685B9]', 'text-white');
+          btn.classList.remove('text-slate-200');
+        } else {
+          btn.classList.remove('bg-[#1685B9]', 'text-white');
+          btn.classList.add('text-slate-200');
+        }
+      });
+
+      if (tabName === 'gis') {
+        setTimeout(() => {
+          initFullMap();
+          if (fullMap) fullMap.invalidateSize();
+        }, 100);
+        setTimeout(() => {
+          if (fullMap) fullMap.invalidateSize();
+        }, 300);
+      } else if (tabName === 'dashboard') {
+        setTimeout(() => {
+          if (miniMap) miniMap.invalidateSize();
+        }, 100);
+      }
+    }
+
+    // Role Switcher Simulator
+    function changeRole(role) {
+      currentRole = role;
+      showToast(`Beralih peran ke: ${role.toUpperCase()}`);
+      if (role === 'masyarakat') {
+        navigateTo('aduan');
+      } else if (role === 'petugas_lapangan') {
+        navigateTo('inspeksi');
+      } else if (role === 'opd') {
+        navigateTo('verifikasi');
+      } else {
+        navigateTo('dashboard');
+      }
+    }
+
+    // Basemap Switcher Handler
+    function setBaseMap(key) {
+      if (!fullMap || !baseLayers[key]) return;
+      Object.keys(baseLayers).forEach(k => {
+        if (fullMap.hasLayer(baseLayers[k])) {
+          fullMap.removeLayer(baseLayers[k]);
+        }
+      });
+      baseLayers[key].addTo(fullMap);
+      currentBaseMap = key;
+
+      // Update button styling
+      ['osm', 'sat', 'light', 'topo'].forEach(k => {
+        const btn = document.getElementById(`btnBase${k.charAt(0).toUpperCase() + k.slice(1)}`);
+        if (btn) {
+          if (k === key) {
+            btn.className = "px-2 py-1 text-[11px] font-bold rounded-md bg-white text-[#123B5D] shadow-sm transition";
+          } else {
+            btn.className = "px-2 py-1 text-[11px] font-medium rounded-md text-slate-600 hover:text-slate-900 transition";
+          }
+        }
+      });
+      const names = { osm: 'OpenStreetMap', sat: 'Satelit Esri', light: 'CartoDB Positron', topo: 'OpenTopoMap' };
+      showToast(`Basemap aktif: ${names[key] || key}`);
+    }
+
+    // Leaflet Mini Map Initialization
+    function initMiniMap() {
+      if (miniMap) {
+        miniMap.invalidateSize();
+        return;
+      }
+      miniMap = L.map('miniMap', { zoomControl: false, attributionControl: false }).setView([-5.4350, 105.1500], 10);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18
+      }).addTo(miniMap);
+
+      // Render roads & points in miniMap
+      assetsData.forEach(item => {
+        const color = item.condition === 'mantap' ? '#20A477' : (item.condition === 'sedang' ? '#E5A33A' : '#D94C4C');
+        if (item.category === 'jalan' && item.coords) {
+          L.polyline(item.coords, { color, weight: 3.5, opacity: 0.9 }).addTo(miniMap);
+        }
+        const marker = L.circleMarker([item.lat, item.lng], {
+          radius: item.category === 'jembatan' ? 6 : 5,
+          fillColor: color,
+          color: '#ffffff',
+          weight: 1.5,
+          opacity: 1,
+          fillOpacity: 0.9
+        }).addTo(miniMap);
+        marker.bindPopup(`
+          <div class="text-xs">
+            <strong>${item.name}</strong><br>
+            <span class="text-slate-500">${item.kecamatan} &bull; ${item.condition.toUpperCase()}</span>
+            <button onclick="focusAssetOnMap(${item.id})" class="mt-2 w-full text-center px-2 py-1 bg-[#123B5D] text-white rounded font-bold text-[10px]">Buka di Peta Penuh</button>
+          </div>
+        `);
+      });
+    }
+
+    // Leaflet Full GIS Map Initialization
+    function initFullMap() {
+      if (!fullMap) {
+        // Initialize layers
+        baseLayers = {
+          osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+          }),
+          sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: 'Tiles &copy; Esri &mdash; Citra Satelit'
+          }),
+          light: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            attribution: '&copy; CartoDB &copy; OSM'
+          }),
+          topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            maxZoom: 17,
+            attribution: '&copy; OpenTopoMap'
+          })
+        };
+
+        fullMap = L.map('fullMap', {
+          zoomControl: true,
+          layers: [baseLayers.osm]
+        }).setView([-5.4350, 105.1500], 11);
+
+        // Add Scale control (metric)
+        L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(fullMap);
+
+        // Coordinates mousemove display
+        fullMap.on('mousemove', (e) => {
+          const displayEl = document.getElementById('mapCoordDisplay');
+          if (displayEl) {
+            displayEl.innerText = `Koordinat Kursor: ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)} (WGS84) &bull; Zoom: ${fullMap.getZoom()}`;
+          }
+        });
+
+        // Click to select coordinate (interactive picker)
+        fullMap.on('click', (e) => {
+          handleMapSelection(e.latlng);
+        });
+      }
+
+      applyGisFilter();
+      setTimeout(() => fullMap.invalidateSize(), 150);
+    }
+
+    // Map Click Selection Handler
+    function handleMapSelection(latlng) {
+      const lat = latlng.lat.toFixed(5);
+      const lng = latlng.lng.toFixed(5);
+
+      const repLat = document.getElementById('reportLat');
+      const repLng = document.getElementById('reportLng');
+      if (repLat) repLat.value = lat;
+      if (repLng) repLng.value = lng;
+
+      const newAssetLat = document.getElementById('newAssetLat');
+      const newAssetLng = document.getElementById('newAssetLng');
+      if (newAssetLat) newAssetLat.value = lat;
+      if (newAssetLng) newAssetLng.value = lng;
+
+      if (selectionMarker) {
+        selectionMarker.setLatLng(latlng);
+      } else {
+        const pinHtml = `
+          <div class="relative flex items-center justify-center">
+            <div class="w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center shadow-lg border-2 border-white animate-bounce text-xs font-bold">
+              📍
+            </div>
+          </div>
+        `;
+        const pickIcon = L.divIcon({
+          className: 'custom-map-icon',
+          html: pinHtml,
+          iconSize: [32, 32],
+          iconAnchor: [16, 30]
+        });
+        selectionMarker = L.marker(latlng, { icon: pickIcon, draggable: true }).addTo(fullMap);
+        selectionMarker.on('dragend', (ev) => {
+          const p = ev.target.getLatLng();
+          if (repLat) repLat.value = p.lat.toFixed(5);
+          if (repLng) repLng.value = p.lng.toFixed(5);
+          showToast(`Koordinat diperbarui: ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`);
+        });
+      }
+
+      selectionMarker.bindPopup(`
+        <div class="text-xs p-1 space-y-1.5">
+          <div class="font-bold text-[#123B5D] flex items-center gap-1">📍 Titik Dipilih (WGS84)</div>
+          <div class="font-mono text-slate-700 bg-slate-100 px-2 py-1 rounded text-[11px] font-bold">${lat}, ${lng}</div>
+          <p class="text-[10px] text-slate-500">Koordinat telah disalin otomatis ke formulir pengaduan &amp; tambah aset.</p>
+          <button onclick="navigateTo('aduan')" class="w-full text-center px-2 py-1 bg-[#1685B9] text-white rounded font-bold text-[10px]">Isi Laporan di Titik Ini</button>
+        </div>
+      `).openPopup();
+
+      showToast(`Koordinat dipilih: ${lat}, ${lng}`);
+    }
+
+    // Kecamatan Selector Change with Auto FlyTo
+    function onGisKecamatanChange() {
+      const kec = document.getElementById('gisFilterKecamatan').value;
+      if (kec !== 'all' && KECAMATAN_CENTERS[kec]) {
+        fullMap.flyTo([KECAMATAN_CENTERS[kec].lat, KECAMATAN_CENTERS[kec].lng], KECAMATAN_CENTERS[kec].zoom, {
+          duration: 1.2
+        });
+        showToast(`Memusatkan peta ke Kecamatan ${kec}`);
+      } else if (kec === 'all') {
+        resetMapCenter();
+      }
+      applyGisFilter();
+    }
+
+    // Reset Map Center to Kabupaten Pesawaran
+    function resetMapCenter() {
+      if (fullMap) {
+        fullMap.flyTo([-5.4350, 105.1500], 11, { duration: 1.0 });
+        const kecSelect = document.getElementById('gisFilterKecamatan');
+        if (kecSelect && kecSelect.value !== 'all') {
+          kecSelect.value = 'all';
+          applyGisFilter();
+        }
+        showToast('Fokus dipulihkan ke wilayah Kabupaten Pesawaran');
+      }
+    }
+
+    // Geolocation: Locate User
+    function locateUserOnMap() {
+      if (!navigator.geolocation) {
+        showToast('Fitur GPS tidak didukung di peramban ini.');
+        return;
+      }
+      showToast('Mencari sinyal GPS perangkat Anda...');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          if (fullMap) {
+            fullMap.flyTo([lat, lng], 15, { duration: 1.2 });
+            const circle = L.circle([lat, lng], {
+              radius: pos.coords.accuracy || 25,
+              color: '#0284c7',
+              fillColor: '#38bdf8',
+              fillOpacity: 0.2
+            }).addTo(fullMap);
+            fullMapMarkers.push(circle);
+
+            const userMarker = L.marker([lat, lng]).addTo(fullMap);
+            userMarker.bindPopup(`
+              <div class="text-xs p-1">
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-600 text-white uppercase">POSISI ANDA</span>
+                <p class="font-bold text-slate-800 text-sm mt-1">Koordinat GPS Lapangan</p>
+                <p class="font-mono text-slate-600 text-[11px] mt-0.5">${lat.toFixed(5)}, ${lng.toFixed(5)}</p>
+                <p class="text-[10px] text-slate-400">Akurasi sinyal: &plusmn;${Math.round(pos.coords.accuracy || 10)} meter</p>
+                <button onclick="handleMapSelection({lat: ${lat}, lng: ${lng}})" class="mt-2 w-full text-center px-2 py-1 bg-[#123B5D] text-white rounded font-bold text-[10px]">Gunakan untuk Laporan</button>
+              </div>
+            `).openPopup();
+            fullMapMarkers.push(userMarker);
+          }
+          showToast(`GPS terdeteksi: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+        },
+        (err) => {
+          showToast(`Gagal membaca GPS (${err.message}). Memusatkan ke Gedong Tataan.`);
+          resetMapCenter();
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+
+    // Search Asset / Report on Map
+    function searchGisAsset() {
+      const q = document.getElementById('gisSearchInput').value.trim().toLowerCase();
+      if (!q) {
+        showToast('Ketik nama ruas jalan, jembatan, atau nomor tiket.');
+        return;
+      }
+
+      // Check in assets
+      const matchAsset = assetsData.find(a => 
+        a.name.toLowerCase().includes(q) || 
+        a.code.toLowerCase().includes(q) || 
+        a.kecamatan.toLowerCase().includes(q) ||
+        a.desa.toLowerCase().includes(q)
+      );
+      if (matchAsset) {
+        focusAssetOnMap(matchAsset.id);
+        showToast(`Ditemukan: ${matchAsset.name} (${matchAsset.code})`);
+        return;
+      }
+
+      // Check in reports
+      const matchRep = reportsData.find(r => 
+        r.ticket.toLowerCase().includes(q) || 
+        r.description.toLowerCase().includes(q) || 
+        r.name.toLowerCase().includes(q)
+      );
+      if (matchRep) {
+        focusReportOnMap(matchRep.ticket);
+        showToast(`Ditemukan Aduan: ${matchRep.ticket}`);
+        return;
+      }
+
+      showToast(`Aset atau laporan "${q}" tidak ditemukan.`);
+    }
+
+    // Toggle Map Fullscreen
+    function toggleMapFullscreen() {
+      const mapEl = document.getElementById('fullMap');
+      if (!document.fullscreenElement) {
+        if (mapEl.requestFullscreen) {
+          mapEl.requestFullscreen();
+        } else if (mapEl.webkitRequestFullscreen) {
+          mapEl.webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+    document.addEventListener('fullscreenchange', () => {
+      if (fullMap) {
+        setTimeout(() => fullMap.invalidateSize(), 200);
+      }
+    });
+
+    // Focus & Open Asset on Map from anywhere
+    function focusAssetOnMap(id) {
+      navigateTo('gis');
+      setTimeout(() => {
+        initFullMap();
+        const asset = assetsData.find(a => a.id === id);
+        if (!asset) return;
+        fullMap.flyTo([asset.lat, asset.lng], 15, { duration: 1.2 });
+        setTimeout(() => {
+          const target = fullMapMarkers.find(m => m._assetId === id);
+          if (target && target.openPopup) {
+            target.openPopup();
+          }
+        }, 1300);
+      }, 150);
+    }
+
+    // Focus & Open Report on Map from anywhere
+    function focusReportOnMap(ticket) {
+      navigateTo('gis');
+      setTimeout(() => {
+        initFullMap();
+        const report = reportsData.find(r => r.ticket === ticket);
+        if (!report) return;
+        fullMap.flyTo([report.lat, report.lng], 16, { duration: 1.2 });
+        setTimeout(() => {
+          const target = fullMapMarkers.find(m => m._reportTicket === ticket);
+          if (target && target.openPopup) {
+            target.openPopup();
+          }
+        }, 1300);
+      }, 150);
+    }
+
+    // Main GIS Filter and Spatial Layer Renderer
+    function applyGisFilter() {
+      if (!fullMap) return;
+
+      // Clear existing markers & geometries
+      fullMapMarkers.forEach(m => fullMap.removeLayer(m));
+      fullMapMarkers = [];
+
+      const kecFilter = document.getElementById('gisFilterKecamatan').value;
+      const condFilter = document.getElementById('gisFilterKondisi').value;
+      const showJalan = document.getElementById('layerJalan').checked;
+      const showJembatan = document.getElementById('layerJembatan').checked;
+      const showDrainase = document.getElementById('layerDrainase').checked;
+      const showAduan = document.getElementById('layerAduan').checked;
+      const showKecamatan = document.getElementById('layerKecamatan') ? document.getElementById('layerKecamatan').checked : true;
+
+      let visibleAssetsCount = 0;
+      let visibleReportsCount = 0;
+
+      // 1. Render Assets (Jalan, Jembatan, Drainase)
+      assetsData.forEach(item => {
+        if (kecFilter !== 'all' && item.kecamatan !== kecFilter) return;
+        if (condFilter !== 'all' && item.condition !== condFilter) return;
+        if (item.category === 'jalan' && !showJalan) return;
+        if (item.category === 'jembatan' && !showJembatan) return;
+        if (item.category === 'drainase' && !showDrainase) return;
+
+        visibleAssetsCount++;
+        const color = item.condition === 'mantap' ? '#20A477' : (item.condition === 'sedang' ? '#E5A33A' : '#D94C4C');
+        const condLabel = item.condition === 'mantap' ? 'Kondisi Mantap (Baik)' : (item.condition === 'sedang' ? 'Kondisi Sedang' : (item.condition === 'rusak_ringan' ? 'Rusak Ringan' : 'Rusak Berat'));
+
+        const popupContent = `
+          <div class="text-xs p-1 max-w-[240px]">
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span class="px-2 py-0.5 rounded text-[10px] font-black text-white uppercase shadow-sm" style="background:${color}">
+                ${item.condition}
+              </span>
+              <span class="text-[10px] font-mono text-slate-400 font-bold">${item.code}</span>
+            </div>
+            <h4 class="font-extrabold text-[#123B5D] text-sm leading-snug">${item.name}</h4>
+            <p class="text-slate-600 mt-1">Kec. ${item.kecamatan} &bull; Desa ${item.desa}</p>
+            <div class="mt-1.5 pt-1.5 border-t border-slate-100 text-[11px] text-slate-500 space-y-0.5">
+              <p>Panjang / Lebar: <strong>${item.lengthM}m &times; ${item.widthM}m</strong></p>
+              <p>Konstruksi: <strong>${item.surface}</strong> (${item.year})</p>
+            </div>
+            <div class="flex gap-1.5 mt-3">
+              <button onclick="navigateTo('assets');" class="w-full text-center px-2 py-1.5 bg-[#123B5D] hover:bg-[#1685B9] text-white rounded font-bold text-[10px] transition">
+                Buka Inventaris
+              </button>
+            </div>
+          </div>
+        `;
+
+        // Render Road Polylines
+        if (item.category === 'jalan' && item.coords) {
+          // Road white outer casing for high visibility
+          const casing = L.polyline(item.coords, {
+            color: '#FFFFFF',
+            weight: 8,
+            opacity: 0.9,
+            lineCap: 'round',
+            lineJoin: 'round'
+          }).addTo(fullMap);
+          fullMapMarkers.push(casing);
+
+          // Road main colored line
+          const roadLine = L.polyline(item.coords, {
+            color: color,
+            weight: 5,
+            opacity: 0.95,
+            lineCap: 'round',
+            lineJoin: 'round'
+          }).addTo(fullMap);
+          roadLine.bindPopup(popupContent);
+          roadLine._assetId = item.id;
+          roadLine.on('mouseover', () => roadLine.setStyle({ weight: 7 }));
+          roadLine.on('mouseout', () => roadLine.setStyle({ weight: 5 }));
+          fullMapMarkers.push(roadLine);
+        }
+
+        // Render Drainage Polylines
+        if (item.category === 'drainase' && item.coords) {
+          const drainLine = L.polyline(item.coords, {
+            color: '#0891B2',
+            weight: 4.5,
+            dashArray: '8, 6',
+            opacity: 0.95
+          }).addTo(fullMap);
+          drainLine.bindPopup(popupContent);
+          drainLine._assetId = item.id;
+          fullMapMarkers.push(drainLine);
+        }
+
+        // Render Representative Marker (Bridge or Point)
+        if (item.category === 'jembatan') {
+          const bridgeIconHtml = `
+            <div class="relative flex items-center justify-center">
+              <div class="w-7 h-7 rounded-lg bg-[#1685B9] text-white flex items-center justify-center shadow-md border-2 border-white text-xs font-bold hover:scale-110 transition-transform">
+                🌉
+              </div>
+            </div>
+          `;
+          const bridgeIcon = L.divIcon({
+            className: 'custom-map-icon',
+            html: bridgeIconHtml,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+          });
+          const marker = L.marker([item.lat, item.lng], { icon: bridgeIcon }).addTo(fullMap);
+          marker.bindPopup(popupContent);
+          marker._assetId = item.id;
+          fullMapMarkers.push(marker);
+        } else {
+          // Standard point marker
+          const marker = L.circleMarker([item.lat, item.lng], {
+            radius: 7,
+            fillColor: color,
+            color: '#ffffff',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.95
+          }).addTo(fullMap);
+          marker.bindPopup(popupContent);
+          marker._assetId = item.id;
+          fullMapMarkers.push(marker);
+        }
+      });
+
+      // 2. Render Citizen Reports (Aduan Kerusakan Warga)
+      if (showAduan) {
+        reportsData.forEach(rep => {
+          if (kecFilter !== 'all' && rep.kecamatan !== kecFilter) return;
+          visibleReportsCount++;
+
+          const reportPinHtml = `
+            <div class="pulse-warning-pin flex items-center justify-center">
+              <div class="w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center shadow-lg border-2 border-white text-[10px] font-black">
+                ⚠️
+              </div>
+            </div>
+          `;
+          const reportIcon = L.divIcon({
+            className: 'custom-map-icon',
+            html: reportPinHtml,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          });
+
+          const reportMarker = L.marker([rep.lat, rep.lng], { icon: reportIcon }).addTo(fullMap);
+          reportMarker.bindPopup(`
+            <div class="text-xs p-1 max-w-[240px]">
+              <div class="flex items-center justify-between mb-1">
+                <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-red-600 text-white uppercase shadow-sm">
+                  ADUAN PUBLIK
+                </span>
+                <span class="font-mono text-[10px] font-bold text-slate-500">${rep.ticket}</span>
+              </div>
+              <h4 class="font-extrabold text-slate-800 text-sm mt-1 leading-tight">${rep.location}</h4>
+              <p class="text-slate-600 font-semibold mt-1 text-[11px]">${rep.description}</p>
+              <div class="mt-2 pt-1 border-t border-slate-100 text-[10px] text-slate-500 space-y-0.5">
+                <p>Pelapor: <strong>${rep.name}</strong> (${rep.phone})</p>
+                <p>Status: <strong class="uppercase text-amber-700">${rep.status}</strong></p>
+              </div>
+              <button onclick="openSPKModal('${rep.ticket}')" class="mt-2.5 w-full text-center px-2 py-1.5 bg-[#E5A33A] hover:bg-amber-500 text-slate-900 rounded font-black text-[11px] transition">
+                Tindak Lanjut &amp; Terbitkan SPK
+              </button>
+            </div>
+          `);
+          reportMarker._reportTicket = rep.ticket;
+          fullMapMarkers.push(reportMarker);
+        });
+      }
+
+      // 3. Render Kecamatan Boundaries / Centers if active
+      if (showKecamatan) {
+        Object.keys(KECAMATAN_CENTERS).forEach(name => {
+          if (kecFilter !== 'all' && name !== kecFilter) return;
+          const k = KECAMATAN_CENTERS[name];
+          
+          // Subtle district influence circle
+          const kecCircle = L.circle([k.lat, k.lng], {
+            radius: 2800,
+            color: '#4F46E5',
+            fillColor: '#818CF8',
+            fillOpacity: 0.05,
+            weight: 1.5,
+            dashArray: '5, 5'
+          }).addTo(fullMap);
+          fullMapMarkers.push(kecCircle);
+
+          // Center label pin
+          const kecPinHtml = `
+            <div class="bg-indigo-900/80 text-white font-black text-[9px] px-1.5 py-0.5 rounded shadow border border-white whitespace-nowrap text-center">
+              🏛️ ${name}
+            </div>
+          `;
+          const kecLabelIcon = L.divIcon({
+            className: 'custom-map-icon',
+            html: kecPinHtml,
+            iconSize: [80, 20],
+            iconAnchor: [40, 10]
+          });
+          const labelMarker = L.marker([k.lat, k.lng], { icon: kecLabelIcon }).addTo(fullMap);
+          labelMarker.bindPopup(`
+            <div class="text-xs p-1">
+              <span class="text-[10px] font-bold text-indigo-700">KANTOR KECAMATAN</span>
+              <h4 class="font-extrabold text-slate-800 text-sm">Kecamatan ${name}</h4>
+              <p class="text-slate-500 text-[11px]">Kode Wilayah: ${k.code} &bull; Kab. Pesawaran</p>
+              <button onclick="onGisKecamatanChange();" class="mt-2 w-full text-center px-2 py-1 bg-indigo-600 text-white rounded font-bold text-[10px]">Fokus Wilayah Ini</button>
+            </div>
+          `);
+          fullMapMarkers.push(labelMarker);
+        });
+      }
+
+      // Update badge count
+      const badge = document.getElementById('gisActiveCountBadge');
+      if (badge) {
+        badge.innerText = `Menampilkan ${visibleAssetsCount} Aset & ${visibleReportsCount} Aduan`;
+      }
+    }
+
+    // Render Dashboard Feed
+    function renderDashboardFeed() {
+      const container = document.getElementById('dashboardRecentReports');
+      container.innerHTML = reportsData.map(r => `
+        <div class="p-3 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition cursor-pointer" onclick="navigateTo('tracking'); document.getElementById('trackTicketInput').value='${r.ticket}'; performTracking();">
+          <div class="flex items-center justify-between text-[11px] mb-1">
+            <span class="font-bold text-[#123B5D]">${r.ticket}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+              r.status === 'in_progress' ? 'bg-indigo-100 text-indigo-700' : 
+              (r.status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')
+            }">${r.status}</span>
+          </div>
+          <p class="text-xs font-semibold text-slate-800 line-clamp-1">${r.description}</p>
+          <div class="flex items-center justify-between text-[10px] text-slate-400 mt-2">
+            <span>Kec. ${r.kecamatan}</span>
+            <div class="flex items-center gap-2">
+              <button onclick="event.stopPropagation(); focusReportOnMap('${r.ticket}');" class="text-[#1685B9] hover:underline font-bold">Peta 📍</button>
+              <span>${r.date}</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Render Assets Table
+    let currentAssetFilter = 'all';
+    function filterAssetTab(cat) {
+      currentAssetFilter = cat;
+      ['all', 'jalan', 'jembatan', 'drainase'].forEach(c => {
+        const btn = document.getElementById(`btn-tab-${c}`);
+        if (c === cat) {
+          btn.className = 'px-3 py-1.5 rounded-lg bg-[#123B5D] text-white font-semibold';
+        } else {
+          btn.className = 'px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 font-semibold';
+        }
+      });
+      renderAssetTable();
+    }
+
+    function renderAssetTable() {
+      const search = document.getElementById('searchAssetInput').value.toLowerCase();
+      const tbody = document.getElementById('assetTableBody');
+      const filtered = assetsData.filter(a => {
+        if (currentAssetFilter !== 'all' && a.category !== currentAssetFilter) return false;
+        if (search && !a.name.toLowerCase().includes(search) && !a.code.toLowerCase().includes(search)) return false;
+        return true;
+      });
+
+      tbody.innerHTML = filtered.map(a => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="p-3 font-mono font-bold text-[#123B5D]">${a.code}</td>
+          <td class="p-3 font-bold text-slate-800">${a.name}</td>
+          <td class="p-3 uppercase text-[10px] font-bold text-slate-500">${a.category}</td>
+          <td class="p-3">${a.kecamatan} <span class="text-slate-400 text-[11px]">(${a.desa})</span></td>
+          <td class="p-3">${a.lengthM}m &times; ${a.widthM}m</td>
+          <td class="p-3">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+              a.condition === 'mantap' ? 'bg-emerald-100 text-emerald-800' :
+              (a.condition === 'sedang' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800')
+            }">${a.condition}</span>
+          </td>
+          <td class="p-3 font-mono text-[11px] text-slate-500">${a.lat.toFixed(4)}, ${a.lng.toFixed(4)}</td>
+          <td class="p-3 text-right whitespace-nowrap">
+            <button onclick="focusAssetOnMap(${a.id})" class="text-[#1685B9] hover:underline font-bold mr-2 text-xs">🗺️ Peta</button>
+            <button onclick="showToast('Menampilkan detail aset ${a.code}')" class="text-blue-600 hover:underline font-bold mr-2">Detail</button>
+            <button onclick="deleteAsset(${a.id})" class="text-red-500 hover:underline font-semibold">Hapus</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function saveNewAsset(e) {
+      e.preventDefault();
+      const newAsset = {
+        id: assetsData.length + 1,
+        code: document.getElementById('newAssetCode').value,
+        name: document.getElementById('newAssetName').value,
+        category: document.getElementById('newAssetCategory').value,
+        kecamatan: document.getElementById('newAssetKecamatan').value,
+        desa: 'Pusat Kecamatan',
+        condition: document.getElementById('newAssetCondition').value,
+        lengthM: parseFloat(document.getElementById('newAssetLength').value),
+        widthM: parseFloat(document.getElementById('newAssetWidth').value),
+        surface: 'Standar PUPR',
+        year: 2026,
+        lat: parseFloat(document.getElementById('newAssetLat').value),
+        lng: parseFloat(document.getElementById('newAssetLng').value)
+      };
+
+      assetsData.push(newAsset);
+      closeModal('modalAddAsset');
+      renderAssetTable();
+      showToast('Aset baru berhasil disimpan ke basis data SIM-PESAWARAN!');
+    }
+
+    function deleteAsset(id) {
+      if (confirm('Apakah Anda yakin ingin menghapus arsip aset ini?')) {
+        assetsData = assetsData.filter(a => a.id !== id);
+        renderAssetTable();
+        showToast('Aset telah dinonaktifkan.');
+      }
+    }
+
+    // Citizen Damage Report Submission
+    function submitDamageReport(e) {
+      e.preventDefault();
+      const ticketNum = `TIK-PSW-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      const newReport = {
+        id: reportsData.length + 1,
+        ticket: ticketNum,
+        name: document.getElementById('reportName').value,
+        phone: document.getElementById('reportPhone').value,
+        category: document.getElementById('reportCategory').value,
+        kecamatan: document.getElementById('reportKecamatan').value,
+        desa: 'Lokasi Terdaftar',
+        location: document.getElementById('reportLocationDetail').value,
+        description: document.getElementById('reportDescription').value,
+        severity: document.getElementById('reportSeverity').value,
+        status: 'submitted',
+        lat: parseFloat(document.getElementById('reportLat').value),
+        lng: parseFloat(document.getElementById('reportLng').value),
+        date: 'Hari ini'
+      };
+
+      reportsData.unshift(newReport);
+      renderDashboardFeed();
+      renderVerifikasiTable();
+
+      alert(`Laporan Berhasil Terkirim!\n\nNomor Tiket Anda: ${ticketNum}\n\nSimpan nomor tiket ini untuk melacak tindak lanjut perbaikan.`);
+      document.getElementById('reportForm').reset();
+      navigateTo('tracking');
+      document.getElementById('trackTicketInput').value = ticketNum;
+      performTracking();
+    }
+
+    // Geolocation API helper
+    function getCurrentLocation() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          document.getElementById('reportLat').value = pos.coords.latitude.toFixed(5);
+          document.getElementById('reportLng').value = pos.coords.longitude.toFixed(5);
+          showToast(`Koordinat GPS terdeteksi: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
+        }, () => {
+          showToast('Izin lokasi GPS tidak aktif. Menggunakan koordinat pusat Gedong Tataan.');
+        });
+      }
+    }
+
+    function previewReportImage(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const img = document.getElementById('imagePreview');
+          img.src = e.target.result;
+          img.classList.remove('hidden');
+          document.getElementById('imagePreviewContainer').classList.add('hidden');
+        }
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // Tracking Logic
+    function performTracking() {
+      const code = document.getElementById('trackTicketInput').value.trim().toUpperCase();
+      const rep = reportsData.find(r => r.ticket === code);
+      const resContainer = document.getElementById('trackingResult');
+
+      if (!rep) {
+        showToast('Nomor tiket tidak ditemukan. Coba: TIK-PSW-2026-0814');
+        return;
+      }
+
+      resContainer.classList.remove('hidden');
+      document.getElementById('trackResultTicket').innerText = rep.ticket;
+      document.getElementById('trackResultTitle').innerText = `${rep.description} (${rep.kecamatan})`;
+      
+      const badge = document.getElementById('trackResultBadge');
+      badge.innerHTML = `<span class="px-3 py-1 rounded-full text-xs font-bold uppercase bg-amber-100 text-amber-800">${rep.status}</span>`;
+
+      // Update progression visual
+      const isProgress = rep.status === 'in_progress';
+      const isVerified = rep.status === 'verified' || isProgress;
+      
+      document.getElementById('step2Icon').className = isVerified ? 'w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold z-10' : 'w-7 h-7 rounded-full bg-slate-300 text-slate-600 flex items-center justify-center text-xs font-bold z-10';
+      document.getElementById('step4Icon').className = isProgress ? 'w-7 h-7 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center text-xs font-bold z-10' : 'w-7 h-7 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold z-10';
+    }
+
+    // Verifikasi Table (OPD)
+    function renderVerifikasiTable() {
+      const tbody = document.getElementById('verifikasiTableBody');
+      tbody.innerHTML = reportsData.map(r => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="p-3">
+            <span class="font-bold text-[#123B5D]">${r.ticket}</span>
+            <p class="text-[10px] text-slate-400">${r.date}</p>
+          </td>
+          <td class="p-3">
+            <p class="font-bold text-slate-800">${r.name}</p>
+            <p class="text-[10px] text-slate-500">${r.phone}</p>
+          </td>
+          <td class="p-3">
+            <span class="uppercase text-[10px] font-bold text-slate-600">${r.category}</span>
+            <p class="text-slate-800">${r.kecamatan}</p>
+          </td>
+          <td class="p-3 max-w-xs text-slate-700">${r.description}</td>
+          <td class="p-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+              r.severity === 'kritis' || r.severity === 'berat' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+            }">${r.severity}</span>
+          </td>
+          <td class="p-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-700">${r.status}</span>
+          </td>
+          <td class="p-3 text-right whitespace-nowrap">
+            <button onclick="focusReportOnMap('${r.ticket}')" class="px-2 py-1 bg-sky-100 text-sky-800 rounded font-bold hover:bg-sky-200 transition mr-1 text-xs">🗺️ Peta</button>
+            <button onclick="openSPKModal('${r.ticket}')" class="px-2.5 py-1 bg-[#20A477] text-white rounded font-bold hover:bg-emerald-700 transition">Verifikasi & SPK</button>
+            <button onclick="rejectReport('${r.ticket}')" class="px-2 py-1 bg-red-100 text-red-700 rounded font-bold hover:bg-red-200 transition ml-1">Tolak</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    let activeSPKTicket = null;
+    function openSPKModal(ticket) {
+      activeSPKTicket = ticket;
+      const rep = reportsData.find(r => r.ticket === ticket);
+      document.getElementById('spkModalTicket').innerText = ticket;
+      document.getElementById('spkModalDesc').innerText = rep ? rep.description : '';
+      openModal('modalAssignSPK');
+    }
+
+    function confirmIssueSPK() {
+      if (!activeSPKTicket) return;
+      const rep = reportsData.find(r => r.ticket === activeSPKTicket);
+      if (rep) {
+        rep.status = 'in_progress';
+      }
+      closeModal('modalAssignSPK');
+      renderVerifikasiTable();
+      renderDashboardFeed();
+      showToast(`SPK Berhasil diterbitkan untuk aduan ${activeSPKTicket}!`);
+    }
+
+    function rejectReport(ticket) {
+      const reason = prompt('Masukkan alasan penolakan aduan (wajib untuk transparansi):');
+      if (reason) {
+        const rep = reportsData.find(r => r.ticket === ticket);
+        if (rep) rep.status = 'rejected';
+        renderVerifikasiTable();
+        showToast(`Aduan ${ticket} ditolak dengan alasan: "${reason}"`);
+      }
+    }
+
+    // Inspeksi Lapangan Cards
+    function renderInspectionCards() {
+      const container = document.getElementById('inspectionCardsContainer');
+      container.innerHTML = `
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-[#123B5D]">INSP-PSW-2026-081</span>
+            <span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-bold text-[10px]">DIJADWALKAN</span>
+          </div>
+          <h4 class="font-bold text-slate-800 text-sm">Inspeksi Struktur Jembatan Way Semah I</h4>
+          <p class="text-xs text-slate-500">Kedondong &bull; Petugas: Rizki Pratama & Tim Reaksi Cepat</p>
+          <div class="pt-2 flex items-center justify-between text-xs border-t">
+            <span class="text-slate-400">Target: 11 Nov 2026</span>
+            <button onclick="showToast('Membuka checklist inspeksi...') " class="px-3 py-1 bg-[#123B5D] text-white rounded font-bold">Mulai Cek</button>
+          </div>
+        </div>
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-[#123B5D]">INSP-PSW-2026-079</span>
+            <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px]">SELESAI</span>
+          </div>
+          <h4 class="font-bold text-slate-800 text-sm">Uji Kelayakan Drainase Kuta Dalom</h4>
+          <p class="text-xs text-slate-500">Way Lima &bull; Petugas: Irfan Hakim, S.T.</p>
+          <div class="pt-2 flex items-center justify-between text-xs border-t">
+            <span class="text-slate-400">10 Nov 2026</span>
+            <button onclick="showToast('Mengunduh berita acara inspeksi PDF')" class="px-3 py-1 bg-slate-200 text-slate-700 rounded font-bold">Lihat BAP</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Monitoring Maintenance Projects
+    function renderMaintenanceProjects() {
+      const container = document.getElementById('maintenanceProjectsContainer');
+      container.innerHTML = maintenanceProjects.map(m => `
+        <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono font-bold text-[#123B5D]">${m.spk}</span>
+            <span class="px-2.5 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded-full">${m.status}</span>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-800 text-sm">${m.title}</h4>
+            <p class="text-xs text-slate-500">Kec. ${m.kecamatan} &bull; Penanggung Jawab: ${m.team}</p>
+          </div>
+          
+          <div>
+            <div class="flex items-center justify-between text-xs font-semibold mb-1">
+              <span class="text-slate-600">Progres Pekerjaan Fisik</span>
+              <span class="text-[#123B5D] font-bold">${m.progress}%</span>
+            </div>
+            <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+              <div class="bg-gradient-to-r from-[#1685B9] to-[#20A477] h-full rounded-full transition-all duration-500" style="width: ${m.progress}%"></div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-200 text-slate-500">
+            <span>Target: <strong>${m.target}</strong></span>
+            <button onclick="updateProgressPrompt(${m.id})" class="px-3 py-1.5 bg-[#1685B9] hover:bg-sky-700 text-white rounded-lg font-bold transition">Update Progres</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateProgressPrompt(id) {
+      const proj = maintenanceProjects.find(m => m.id === id);
+      if (proj) {
+        const val = prompt(`Perbarui persentase progres untuk ${proj.spk} (0 - 100):`, proj.progress);
+        if (val !== null && !isNaN(val)) {
+          proj.progress = Math.min(100, Math.max(0, parseInt(val)));
+          if (proj.progress === 100) proj.status = 'Selesai';
+          renderMaintenanceProjects();
+          showToast(`Progres pekerjaan ${proj.spk} diperbarui menjadi ${proj.progress}%`);
+        }
+      }
+    }
+
+    // Chart.js Statistics Initialization
+    function initCharts() {
+      // 1. Chart Kecamatan
+      const ctxKec = document.getElementById('chartKecamatan');
+      if (ctxKec) {
+        new Chart(ctxKec, {
+          type: 'bar',
+          data: {
+            labels: ['Gedong Tataan', 'Kedondong', 'Way Lima', 'Padang Cermin', 'Teluk Pandan', 'Way Ratai'],
+            datasets: [
+              { label: 'Mantap (%)', data: [84, 68, 79, 74, 82, 60], backgroundColor: '#20A477' },
+              { label: 'Rusak (%)', data: [16, 32, 21, 26, 18, 40], backgroundColor: '#D94C4C' }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, max: 100 } }
+          }
+        });
+      }
+
+      // 2. Chart Tren
+      const ctxTren = document.getElementById('chartTren');
+      if (ctxTren) {
+        new Chart(ctxTren, {
+          type: 'line',
+          data: {
+            labels: ['Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov'],
+            datasets: [
+              { label: 'Aduan Masuk', data: [18, 24, 29, 35, 31, 28], borderColor: '#E5A33A', backgroundColor: 'rgba(229,163,58,0.1)', tension: 0.3, fill: true },
+              { label: 'Selesai Diperbaiki', data: [15, 20, 26, 32, 30, 25], borderColor: '#1685B9', tension: 0.3 }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false
+          }
+        });
+      }
+    }
+
+    // Export to CSV Function
+    function exportAssetsToCSV() {
+      let csv = 'Kode Aset,Nama,Kategori,Kecamatan,Desa,Kondisi,Panjang_m,Lebar_m,Permukaan,Tahun,Latitude,Longitude\n';
+      assetsData.forEach(a => {
+        csv += `"${a.code}","${a.name}","${a.category}","${a.kecamatan}","${a.desa}","${a.condition}",${a.lengthM},${a.widthM},"${a.surface}",${a.year},${a.lat},${a.lng}\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `SIM_PESAWARAN_ASET_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('File CSV Aset berhasil diunduh untuk Microsoft Excel!');
+    }
+
+    // Print Formal Report
+    function printFormalReport() {
+      window.print();
+    }
+
+    // Toast Utility
+    function showToast(msg) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-xl flex items-center justify-between gap-3 border border-slate-700 animate-fade-in';
+      toast.innerHTML = `<span>${msg}</span><button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white">&times;</button>`;
+      container.appendChild(toast);
+      setTimeout(() => { toast.remove(); }, 4000);
+    }
+
+    // Modal helpers
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
