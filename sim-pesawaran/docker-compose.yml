@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: sim_pesawaran_db
+    environment:
+      POSTGRES_USER: sim_user
+      POSTGRES_PASSWORD: sim_secure_password_2026
+      POSTGRES_DB: sim_pesawaran
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sim_pesawaran_api
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgres://sim_user:sim_secure_password_2026@db:5432/sim_pesawaran
+      RUST_LOG: info
+      PORT: 8080
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:

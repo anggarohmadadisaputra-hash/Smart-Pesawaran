@@ -1,0 +1,24 @@
+[package]
+name = "sim-pesawaran-backend"
+version = "0.1.0"
+edition = "2021"
+authors = ["Angga Rohmad Adi Saputra", "Dr. Erliyan Redy Susanto, M.Kom"]
+description = "SIM-PESAWARAN Smart Infrastructure Monitoring Kabupaten Pesawaran Backend Service"
+
+[dependencies]
+axum = { version = "0.7", features = ["macros", "multipart"] }
+tokio = { version = "1.38", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json", "migrate"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.8", features = ["v4", "serde"] }
+argon2 = "0.5"
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+validator = { version = "0.18", features = ["derive"] }
+utoipa = { version = "4.2", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "7.1", features = ["axum"] }
+dotenvy = "0.15"
